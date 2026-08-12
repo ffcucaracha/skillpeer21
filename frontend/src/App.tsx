@@ -1,8 +1,9 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, clearTokens, getAccessToken, saveTokens, type Skill } from "./api";
+import { api, clearTokens, getAccessToken, saveTokens, type Dashboard, type Skill } from "./api";
 
 type SkillIntent = "teach" | "learn";
+type CommunityView = "members" | "skills" | "teachers";
 type IconName = "spark" | "people" | "book" | "teach" | "learn" | "plus" | "logout" | "arrow" | "calendar" | "history";
 
 function Icon({ name }: { name: IconName }) {
@@ -29,48 +30,9 @@ function openEvents(mode: "active" | "history" | "create") {
 function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
-  const mutation = useMutation({
-    mutationFn: () => api.login(login, password),
-    onSuccess: (tokens) => {
-      saveTokens(tokens);
-      onLoggedIn();
-    },
-  });
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    mutation.mutate();
-  }
-
-  return (
-    <main className="login-page">
-      <section className="login-brand">
-        <div className="brand-mark">21</div>
-        <span>School 21 community</span>
-        <h1>Навыки становятся сильнее, когда ими делятся.</h1>
-        <p>SkillPeer21 соединяет тех, кто хочет научиться, с теми, кто готов передать свой опыт.</p>
-        <div className="brand-points">
-          <span><Icon name="spark" /> Находи совпадения по интересам</span>
-          <span><Icon name="people" /> Учись у равных и учи сам</span>
-        </div>
-      </section>
-      <section className="login-panel">
-        <form className="login-card" onSubmit={submit}>
-          <div>
-            <span className="kicker">Добро пожаловать</span>
-            <h2>Войти в SkillPeer21</h2>
-            <p>Используй логин и временный пароль, выданные администратором.</p>
-          </div>
-          <label>Логин<input value={login} onChange={(event) => setLogin(event.target.value)} autoComplete="username" required /></label>
-          <label>Пароль<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
-          {mutation.isError && <div className="error-message">Не удалось войти. Проверь логин и пароль.</div>}
-          <button className="primary-button" type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? "Входим…" : "Войти"}{!mutation.isPending && <Icon name="arrow" />}
-          </button>
-        </form>
-      </section>
-    </main>
-  );
+  const mutation = useMutation({ mutationFn: () => api.login(login, password), onSuccess: (tokens) => { saveTokens(tokens); onLoggedIn(); } });
+  function submit(event: FormEvent) { event.preventDefault(); mutation.mutate(); }
+  return <main className="login-page"><section className="login-brand"><div className="brand-mark">21</div><span>School 21 community</span><h1>Навыки становятся сильнее, когда ими делятся.</h1><p>SkillPeer21 соединяет тех, кто хочет научиться, с теми, кто готов передать свой опыт.</p><div className="brand-points"><span><Icon name="spark" /> Находи совпадения по интересам</span><span><Icon name="people" /> Учись у равных и учи сам</span></div></section><section className="login-panel"><form className="login-card" onSubmit={submit}><div><span className="kicker">Добро пожаловать</span><h2>Войти в SkillPeer21</h2><p>Используй логин и временный пароль, выданные администратором.</p></div><label>Логин<input value={login} onChange={(event) => setLogin(event.target.value)} autoComplete="username" required /></label><label>Пароль<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>{mutation.isError && <div className="error-message">Не удалось войти. Проверь логин и пароль.</div>}<button className="primary-button" type="submit" disabled={mutation.isPending}>{mutation.isPending ? "Входим…" : "Войти"}{!mutation.isPending && <Icon name="arrow" />}</button></form></section></main>;
 }
 
 function SkillPicker({ skills, initialIntent, onDone }: { skills: Skill[]; initialIntent: SkillIntent; onDone: () => void }) {
@@ -78,193 +40,60 @@ function SkillPicker({ skills, initialIntent, onDone }: { skills: Skill[]; initi
   const [name, setName] = useState("");
   const [selectedSkillId, setSelectedSkillId] = useState<number | null>(null);
   const [intent, setIntent] = useState<SkillIntent>(initialIntent);
-
   const createMutation = useMutation({ mutationFn: () => api.createSkill(name) });
-  const linkMutation = useMutation({
-    mutationFn: ({ skillId, skillIntent }: { skillId: number; skillIntent: SkillIntent }) => api.addSkillIntent(skillId, skillIntent),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
-        queryClient.invalidateQueries({ queryKey: ["skills"] }),
-        queryClient.invalidateQueries({ queryKey: ["my-skills"] }),
-      ]);
-      setName("");
-      setSelectedSkillId(null);
-      onDone();
-    },
-  });
-
-  async function addNewSkill() {
-    if (!name.trim()) return;
-    try {
-      const skill = await createMutation.mutateAsync();
-      await linkMutation.mutateAsync({ skillId: skill.id, skillIntent: intent });
-    } catch {
-      // Error state is rendered below.
-    }
-  }
-
-  async function addExistingSkill() {
-    if (!selectedSkillId) return;
-    try {
-      await linkMutation.mutateAsync({ skillId: selectedSkillId, skillIntent: intent });
-    } catch {
-      // Error state is rendered below.
-    }
-  }
-
+  const linkMutation = useMutation({ mutationFn: ({ skillId, skillIntent }: { skillId: number; skillIntent: SkillIntent }) => api.addSkillIntent(skillId, skillIntent), onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["dashboard"] }), queryClient.invalidateQueries({ queryKey: ["skills"] }), queryClient.invalidateQueries({ queryKey: ["my-skills"] })]); setName(""); setSelectedSkillId(null); onDone(); } });
+  async function addNewSkill() { if (!name.trim()) return; try { const skill = await createMutation.mutateAsync(); await linkMutation.mutateAsync({ skillId: skill.id, skillIntent: intent }); } catch {} }
+  async function addExistingSkill() { if (!selectedSkillId) return; try { await linkMutation.mutateAsync({ skillId: selectedSkillId, skillIntent: intent }); } catch {} }
   const busy = createMutation.isPending || linkMutation.isPending;
   const error = createMutation.error?.message || linkMutation.error?.message;
-
-  return (
-    <div className="skill-editor">
-      <div className="intent-toggle" role="group" aria-label="Тип навыка">
-        <button type="button" className={intent === "teach" ? "active" : ""} onClick={() => setIntent("teach")}><Icon name="teach" /> Могу научить</button>
-        <button type="button" className={intent === "learn" ? "active" : ""} onClick={() => setIntent("learn")}><Icon name="learn" /> Хочу научиться</button>
-      </div>
-      <div className="editor-grid">
-        <label>Выбрать из каталога
-          <select value={selectedSkillId ?? ""} onChange={(event) => setSelectedSkillId(event.target.value ? Number(event.target.value) : null)}>
-            <option value="">Выбери навык</option>
-            {skills.map((skill) => <option key={skill.id} value={skill.id}>{skill.name}</option>)}
-          </select>
-        </label>
-        <button className="secondary-button" type="button" onClick={addExistingSkill} disabled={!selectedSkillId || busy}>Добавить</button>
-      </div>
-      <div className="or-divider"><span>или добавить новый навык</span></div>
-      <div className="editor-grid">
-        <label>Новый навык<input placeholder="Например, фотография" value={name} onChange={(event) => setName(event.target.value)} /></label>
-        <button className="secondary-button" type="button" onClick={addNewSkill} disabled={!name.trim() || busy}>Создать</button>
-      </div>
-      {error && <div className="error-message">{error}</div>}
-    </div>
-  );
+  return <div className="skill-editor"><div className="intent-toggle" role="group" aria-label="Тип навыка"><button type="button" className={intent === "teach" ? "active" : ""} onClick={() => setIntent("teach")}><Icon name="teach" /> Могу научить</button><button type="button" className={intent === "learn" ? "active" : ""} onClick={() => setIntent("learn")}><Icon name="learn" /> Хочу научиться</button></div><div className="editor-grid"><label>Выбрать из каталога<select value={selectedSkillId ?? ""} onChange={(event) => setSelectedSkillId(event.target.value ? Number(event.target.value) : null)}><option value="">Выбери навык</option>{skills.map((skill) => <option key={skill.id} value={skill.id}>{skill.name}</option>)}</select></label><button className="secondary-button" type="button" onClick={addExistingSkill} disabled={!selectedSkillId || busy}>Добавить</button></div><div className="or-divider"><span>или добавить новый навык</span></div><div className="editor-grid"><label>Новый навык<input placeholder="Например, фотография" value={name} onChange={(event) => setName(event.target.value)} /></label><button className="secondary-button" type="button" onClick={addNewSkill} disabled={!name.trim() || busy}>Создать</button></div>{error && <div className="error-message">{error}</div>}</div>;
 }
 
-function Dashboard({ onLogout }: { onLogout: () => void }) {
+function CommunityModal({ view, dashboard, onClose }: { view: CommunityView; dashboard: Dashboard; onClose: () => void }) {
+  const title = view === "members" ? "Участники" : view === "skills" ? "Навыки сообщества" : "Готовы учить";
+  return <div className="community-modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}><section className="community-modal"><header><div><span className="kicker">SkillPeer21</span><h2>{title}</h2></div><button className="community-close" type="button" onClick={onClose}>×</button></header><div className="community-list">
+    {view === "members" && dashboard.members.map((member) => <article className="community-person" key={member.id}><div className="avatar soft">{member.display_name.slice(0, 2).toUpperCase()}</div><div><strong>{member.display_name}</strong><span>{member.telegram_username ? `@${member.telegram_username}` : "Контакт скрыт"}</span></div>{member.telegram_username && <a href={`https://t.me/${member.telegram_username}`} target="_blank" rel="noreferrer">Написать</a>}</article>)}
+    {view === "skills" && dashboard.skills.map((skill) => <article className="community-skill" key={skill.skill_id}><strong>{skill.skill_name}</strong><div><span>{skill.teachers_count} могут научить</span><span>{skill.learners_count} хотят научиться</span></div></article>)}
+    {view === "teachers" && dashboard.teaching_members.map((teacher) => <article className="community-teacher" key={teacher.id}><div className="community-person-row"><div className="avatar soft">{teacher.display_name.slice(0, 2).toUpperCase()}</div><div><strong>{teacher.display_name}</strong><span>{teacher.telegram_username ? `@${teacher.telegram_username}` : "Контакт скрыт"}</span></div>{teacher.telegram_username && <a href={`https://t.me/${teacher.telegram_username}`} target="_blank" rel="noreferrer">Написать</a>}</div><div className="chip-list">{teacher.skills.map((skill) => <span className="chip teach" key={skill}>{skill}</span>)}</div></article>)}
+  </div></section></div>;
+}
+
+function DashboardPage({ onLogout }: { onLogout: () => void }) {
   const [editorIntent, setEditorIntent] = useState<SkillIntent | null>(null);
+  const [communityView, setCommunityView] = useState<CommunityView | null>(null);
   const userQuery = useQuery({ queryKey: ["me"], queryFn: api.me });
   const dashboardQuery = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard });
   const skillsQuery = useQuery({ queryKey: ["skills"], queryFn: api.skills });
   const mySkillsQuery = useQuery({ queryKey: ["my-skills"], queryFn: api.mySkills });
-
   const loading = userQuery.isLoading || dashboardQuery.isLoading || skillsQuery.isLoading || mySkillsQuery.isLoading;
   const failed = userQuery.isError || dashboardQuery.isError || skillsQuery.isError || mySkillsQuery.isError;
-
-  const groupedMySkills = useMemo(() => {
-    const result = { teach: [] as string[], learn: [] as string[] };
-    for (const skill of mySkillsQuery.data ?? []) result[skill.intent].push(skill.skill_name);
-    return result;
-  }, [mySkillsQuery.data]);
-
+  const groupedMySkills = useMemo(() => { const result = { teach: [] as string[], learn: [] as string[] }; for (const skill of mySkillsQuery.data ?? []) result[skill.intent].push(skill.skill_name); return result; }, [mySkillsQuery.data]);
   if (loading) return <main className="center-state"><div className="loader" /><p>Собираем твоё комьюнити…</p></main>;
-  if (failed || !userQuery.data || !dashboardQuery.data) {
-    return <main className="center-state"><h2>Не удалось загрузить дашборд</h2><button className="primary-button" onClick={onLogout}>Войти заново</button></main>;
-  }
-
+  if (failed || !userQuery.data || !dashboardQuery.data) return <main className="center-state"><h2>Не удалось загрузить дашборд</h2><button className="primary-button" onClick={onLogout}>Войти заново</button></main>;
   const user = userQuery.data;
   const dashboard = dashboardQuery.data;
   const firstName = user.display_name.split(" ")[0];
-
-  return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="logo-row"><div className="brand-mark small">21</div><div><strong>SkillPeer21</strong><span>peer-to-peer learning</span></div></div>
-        <nav>
-          <button className="active" type="button"><Icon name="spark" /><span>Главная</span></button>
-          <button type="button" onClick={() => openEvents("active")}><Icon name="calendar" /><span>Встречи</span></button>
-          <button type="button" onClick={() => openEvents("history")}><Icon name="history" /><span>История встреч</span></button>
-        </nav>
-        <div className="sidebar-profile">
-          <div className="avatar">{user.display_name.slice(0, 2).toUpperCase()}</div>
-          <div><strong>{user.display_name}</strong><span>{user.role === "admin" ? "Администратор" : "Участник School 21"}</span></div>
-          <button className="icon-button" type="button" onClick={onLogout} aria-label="Выйти"><Icon name="logout" /></button>
-        </div>
-      </aside>
-
-      <main className="dashboard" id="dashboard">
-        <header className="dashboard-header">
-          <div><span className="kicker">School 21 · обмен опытом</span><h1>Привет, {firstName}.</h1><p>Посмотри, чему сегодня можно научиться у своих пиров.</p></div>
-        </header>
-
-        {editorIntent && (
-          <section className="panel editor-panel">
-            <div className="section-heading"><div><span className="kicker">Мой профиль</span><h2>{editorIntent === "teach" ? "Добавить то, чему я могу научить" : "Добавить то, чему я хочу научиться"}</h2></div><button className="text-button" onClick={() => setEditorIntent(null)}>Закрыть</button></div>
-            <SkillPicker key={editorIntent} skills={skillsQuery.data ?? []} initialIntent={editorIntent} onDone={() => setEditorIntent(null)} />
-          </section>
-        )}
-
-        <section className="metric-grid" aria-label="Статистика сообщества">
-          <article className="metric-card accent"><span className="metric-icon"><Icon name="people" /></span><div><span>Участников</span><strong>{dashboard.summary.members_count}</strong><small>внутри сообщества</small></div></article>
-          <article className="metric-card"><span className="metric-icon"><Icon name="book" /></span><div><span>Навыков</span><strong>{dashboard.summary.skills_count}</strong><small>в общем каталоге</small></div></article>
-          <article className="metric-card"><span className="metric-icon"><Icon name="teach" /></span><div><span>Готовы учить</span><strong>{dashboard.summary.teaching_offers_count}</strong><small>предложений опыта</small></div></article>
-          <article className="metric-card"><span className="metric-icon"><Icon name="spark" /></span><div><span>Совпадений</span><strong>{dashboard.summary.matched_learning_goals_count}</strong><small>целей уже с преподавателем</small></div></article>
-        </section>
-
-        <section className="content-grid" id="matches">
-          <div className="main-column">
-            <div className="section-heading"><div><span className="kicker">Твои совпадения</span><h2>Есть у кого научиться</h2></div><span className="count-badge">{dashboard.matches.length}</span></div>
-            {dashboard.matches.length === 0 ? (
-              <div className="empty-state panel"><span className="empty-icon"><Icon name="spark" /></span><h3>Пока нет прямых совпадений</h3><p>Добавь навык в «Хочу научиться». Как только кто-то отметит тот же навык как «Могу научить», совпадение появится здесь.</p></div>
-            ) : (
-              <div className="match-list">
-                {dashboard.matches.map((match, index) => (
-                  <article className={`match-card ${index === 0 ? "featured" : ""}`} key={match.skill_id}>
-                    <div className="match-top"><div><span className="match-label">Хочу научиться</span><h3>{match.skill_name}</h3></div><span className="teacher-count">{match.teachers.length} {match.teachers.length === 1 ? "пир может научить" : "пира могут научить"}</span></div>
-                    <div className="teacher-stack">
-                      {match.teachers.slice(0, 3).map((teacher) => (
-                        <div className="teacher-row" key={teacher.id}><div className="avatar soft">{teacher.display_name.slice(0, 2).toUpperCase()}</div><div><strong>{teacher.display_name}</strong><span>{teacher.telegram_username ? `@${teacher.telegram_username}` : "Контакт скрыт настройками профиля"}</span></div>{teacher.telegram_username && <a className="telegram-link" href={`https://t.me/${teacher.telegram_username}`} target="_blank" rel="noreferrer">Написать <Icon name="arrow" /></a>}</div>
-                      ))}
-                    </div>
-                    <footer><span>{match.learners_count > 1 ? `Ещё ${match.learners_count - 1} участник(а) хотят этому научиться` : "Ты уже можешь собрать первую встречу"}</span><button className="text-button" type="button" onClick={() => openEvents("create")}>Создать встречу <Icon name="arrow" /></button></footer>
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <aside className="side-column">
-            <section className="panel my-skills">
-              <div className="section-heading"><div><span className="kicker">Мой профиль</span><h2>Навыки</h2></div></div>
-              <div className="skill-group">
-                <div className="skill-group-heading"><span><Icon name="teach" /> Могу научить</span><button className="icon-button bordered compact-plus" type="button" onClick={() => setEditorIntent("teach")} aria-label="Добавить навык, которому могу научить"><Icon name="plus" /></button></div>
-                <div className="chip-list">{groupedMySkills.teach.length ? groupedMySkills.teach.map((name) => <span className="chip teach" key={name}>{name}</span>) : <small>Пока ничего не добавлено</small>}</div>
-              </div>
-              <div className="skill-group">
-                <div className="skill-group-heading"><span><Icon name="learn" /> Хочу научиться</span><button className="icon-button bordered compact-plus" type="button" onClick={() => setEditorIntent("learn")} aria-label="Добавить навык, которому хочу научиться"><Icon name="plus" /></button></div>
-                <div className="chip-list">{groupedMySkills.learn.length ? groupedMySkills.learn.map((name) => <span className="chip learn" key={name}>{name}</span>) : <small>Пока ничего не добавлено</small>}</div>
-              </div>
-            </section>
-          </aside>
-        </section>
-
-        <section className="community-section">
-          <div className="section-heading"><div><span className="kicker">Карта сообщества</span><h2>Чем живёт SkillPeer21</h2></div><span className="muted-note">Сначала самые активные темы</span></div>
-          <div className="skill-stat-grid">
-            {dashboard.skills.slice(0, 8).map((skill) => {
-              const total = skill.teachers_count + skill.learners_count || 1;
-              const teacherShare = Math.round((skill.teachers_count / total) * 100);
-              return <article className="skill-stat-card" key={skill.skill_id}><div><h3>{skill.skill_name}</h3><span>{total} связей с участниками</span></div><div className="balance"><div className="balance-bar"><span style={{ width: `${teacherShare}%` }} /></div><div className="balance-labels"><span><b>{skill.teachers_count}</b> могут научить</span><span><b>{skill.learners_count}</b> хотят</span></div></div></article>;
-            })}
-          </div>
-        </section>
-      </main>
-    </div>
-  );
+  return <div className="app-shell"><aside className="sidebar"><div className="logo-row"><div className="brand-mark small">21</div><div><strong>SkillPeer21</strong><span>peer-to-peer learning</span></div></div><nav><button className="active" type="button"><Icon name="spark" /><span>Главная</span></button><button type="button" onClick={() => openEvents("active")}><Icon name="calendar" /><span>Встречи</span></button><button type="button" onClick={() => openEvents("history")}><Icon name="history" /><span>История встреч</span></button></nav><div className="sidebar-profile"><div className="avatar">{user.display_name.slice(0, 2).toUpperCase()}</div><div><strong>{user.display_name}</strong><span>{user.role === "admin" ? "Администратор" : "Участник School 21"}</span></div><button className="icon-button" type="button" onClick={onLogout} aria-label="Выйти"><Icon name="logout" /></button></div></aside>
+    <main className="dashboard"><header className="dashboard-header"><div><span className="kicker">School 21 · обмен опытом</span><h1>Привет, {firstName}.</h1><p>Посмотри, чему сегодня можно научиться у своих пиров.</p></div></header>
+      {editorIntent && <section className="panel editor-panel"><div className="section-heading"><div><span className="kicker">Мой профиль</span><h2>{editorIntent === "teach" ? "Добавить то, чему я могу научить" : "Добавить то, чему я хочу научиться"}</h2></div><button className="text-button" onClick={() => setEditorIntent(null)}>Закрыть</button></div><SkillPicker key={editorIntent} skills={skillsQuery.data ?? []} initialIntent={editorIntent} onDone={() => setEditorIntent(null)} /></section>}
+      <section className="metric-grid" aria-label="Статистика сообщества">
+        <button className="metric-card accent clickable" type="button" onClick={() => setCommunityView("members")}><span className="metric-icon"><Icon name="people" /></span><div><span>Участников</span><strong>{dashboard.summary.members_count}</strong><small>посмотреть сообщество</small></div></button>
+        <button className="metric-card clickable" type="button" onClick={() => setCommunityView("skills")}><span className="metric-icon"><Icon name="book" /></span><div><span>Навыков</span><strong>{dashboard.summary.skills_count}</strong><small>открыть каталог</small></div></button>
+        <button className="metric-card clickable" type="button" onClick={() => setCommunityView("teachers")}><span className="metric-icon"><Icon name="teach" /></span><div><span>Готовы учить</span><strong>{dashboard.summary.teaching_members_count}</strong><small>посмотреть участников</small></div></button>
+        <article className="metric-card"><span className="metric-icon"><Icon name="spark" /></span><div><span>Совпадений</span><strong>{dashboard.summary.matched_learning_goals_count}</strong><small>навыков с совпадениями</small></div></article>
+      </section>
+      <section className="content-grid"><div className="main-column"><div className="section-heading"><div><span className="kicker">Твои совпадения</span><h2>Есть у кого научиться</h2></div><span className="count-badge">{dashboard.matches.length}</span></div>{dashboard.matches.length === 0 ? <div className="empty-state panel"><span className="empty-icon"><Icon name="spark" /></span><h3>Пока нет прямых совпадений</h3><p>Добавь навык в «Хочу научиться». Как только кто-то отметит тот же навык как «Могу научить», совпадение появится здесь.</p></div> : <div className="match-list">{dashboard.matches.map((match, index) => <article className={`match-card ${index === 0 ? "featured" : ""}`} key={match.skill_id}><div className="match-top"><div><span className="match-label">Хочу научиться</span><h3>{match.skill_name}</h3></div><span className="teacher-count">{match.teachers.length} {match.teachers.length === 1 ? "пир может научить" : "пира могут научить"}</span></div><div className="teacher-stack">{match.teachers.slice(0, 3).map((teacher) => <div className="teacher-row" key={teacher.id}><div className="avatar soft">{teacher.display_name.slice(0, 2).toUpperCase()}</div><div><strong>{teacher.display_name}</strong><span>{teacher.telegram_username ? `@${teacher.telegram_username}` : "Контакт скрыт настройками профиля"}</span></div>{teacher.telegram_username && <a className="telegram-link" href={`https://t.me/${teacher.telegram_username}`} target="_blank" rel="noreferrer">Написать <Icon name="arrow" /></a>}</div>)}</div><footer><span>{match.learners_count > 1 ? `Ещё ${match.learners_count - 1} участник(а) хотят этому научиться` : "Ты уже можешь собрать первую встречу"}</span><button className="text-button" type="button" onClick={() => openEvents("create")}>Создать встречу <Icon name="arrow" /></button></footer></article>)}</div>}</div>
+        <aside className="side-column"><section className="panel my-skills"><div className="section-heading"><div><span className="kicker">Мой профиль</span><h2>Навыки</h2></div></div><div className="skill-group"><div className="skill-group-heading"><span><Icon name="teach" /> Могу научить</span><button className="icon-button bordered compact-plus" type="button" onClick={() => setEditorIntent("teach")} aria-label="Добавить навык, которому могу научить"><Icon name="plus" /></button></div><div className="chip-list">{groupedMySkills.teach.length ? groupedMySkills.teach.map((name) => <span className="chip teach" key={name}>{name}</span>) : <small>Пока ничего не добавлено</small>}</div></div><div className="skill-group"><div className="skill-group-heading"><span><Icon name="learn" /> Хочу научиться</span><button className="icon-button bordered compact-plus" type="button" onClick={() => setEditorIntent("learn")} aria-label="Добавить навык, которому хочу научиться"><Icon name="plus" /></button></div><div className="chip-list">{groupedMySkills.learn.length ? groupedMySkills.learn.map((name) => <span className="chip learn" key={name}>{name}</span>) : <small>Пока ничего не добавлено</small>}</div></div></section></aside></section>
+      <section className="community-section"><div className="section-heading"><div><span className="kicker">Карта сообщества</span><h2>Чем живёт SkillPeer21</h2></div><span className="muted-note">Сначала самые активные темы</span></div><div className="skill-stat-grid">{dashboard.skills.slice(0, 8).map((skill) => { const total = skill.teachers_count + skill.learners_count || 1; const teacherShare = Math.round((skill.teachers_count / total) * 100); return <article className="skill-stat-card" key={skill.skill_id}><div><h3>{skill.skill_name}</h3><span>{total} связей с участниками</span></div><div className="balance"><div className="balance-bar"><span style={{ width: `${teacherShare}%` }} /></div><div className="balance-labels"><span><b>{skill.teachers_count}</b> могут научить</span><span><b>{skill.learners_count}</b> хотят</span></div></div></article>; })}</div></section>
+    </main>{communityView && <CommunityModal view={communityView} dashboard={dashboard} onClose={() => setCommunityView(null)} />}</div>;
 }
 
 function App() {
   const [authenticated, setAuthenticated] = useState(() => Boolean(getAccessToken()));
   const queryClient = useQueryClient();
-
-  function logout() {
-    clearTokens();
-    queryClient.clear();
-    setAuthenticated(false);
-  }
-
+  function logout() { clearTokens(); queryClient.clear(); setAuthenticated(false); }
   if (!authenticated) return <LoginScreen onLoggedIn={() => setAuthenticated(true)} />;
-  return <Dashboard onLogout={logout} />;
+  return <DashboardPage onLogout={logout} />;
 }
 
 export default App;
