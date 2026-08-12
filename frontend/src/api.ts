@@ -168,7 +168,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const api = {
   login: (login: string, password: string) => request<TokenPair>("/auth/login", { method: "POST", body: JSON.stringify({ login, password }) }),
   me: () => request<User>("/auth/me"),
-  updateProfile: (payload: { telegram_username: string | null; telegram_visibility: "everyone" | "admin_only" }) =>
+  updateProfile: (payload: { display_name: string | null; telegram_username: string | null; telegram_visibility: "everyone" | "admin_only" }) =>
     request<User>("/auth/me", { method: "PATCH", body: JSON.stringify(payload) }),
   dashboard: () => request<Dashboard>("/dashboard"),
   skills: () => request<Skill[]>("/skills"),
@@ -185,7 +185,7 @@ export const api = {
   completeEvent: (eventId: number) => request<CommunityEvent>(`/events/${eventId}/complete`, { method: "POST" }),
   giveKudos: (eventId: number, recipientId: number) => request<CommunityEvent>(`/events/${eventId}/kudos/${recipientId}`, { method: "POST" }),
   users: () => request<User[]>("/users"),
-  createUser: (payload: { login: string; display_name: string; temporary_password: string; role: "admin" | "member" }) => request<User>("/users", { method: "POST", body: JSON.stringify(payload) }),
+  createUser: (payload: { login: string; display_name?: string | null; temporary_password: string; role: "admin" | "member" }) => request<User>("/users", { method: "POST", body: JSON.stringify(payload) }),
   adminSummary: () => request<AdminSummary>("/admin/summary"),
   adminEvents: () => request<AdminEvent[]>("/admin/events"),
   updateAdminUser: (userId: number, payload: { is_active?: boolean; role?: "admin" | "member" }) => request<User>(`/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(payload) }),
