@@ -1,11 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
-from app.api.deps import require_admin
+from app.api.deps import AdminUser, DbSession
 from app.core.security import hash_password
-from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserRead
 
@@ -13,11 +11,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def create_user(
-    payload: UserCreate,
-    _: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-) -> User:
+def create_user(payload: UserCreate, _admin: AdminUser, db: DbSession) -> User:
     user = User(
         login=payload.login,
         display_name=payload.display_name,
@@ -38,8 +32,5 @@ def create_user(
 
 
 @router.get("", response_model=list[UserRead])
-def list_users(
-    _: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-) -> list[User]:
+def list_users(_admin: AdminUser, db: DbSession) -> list[User]:
     return list(db.scalars(select(User).order_by(User.display_name, User.id)).all())

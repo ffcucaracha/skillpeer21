@@ -1,3 +1,5 @@
+from typing import Annotated
+
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -8,12 +10,11 @@ from app.db.session import get_db
 from app.models.user import User, UserRole
 
 bearer = HTTPBearer(auto_error=False)
+DbSession = Annotated[Session, Depends(get_db)]
+Credentials = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-    db: Session = Depends(get_db),
-) -> User:
+def get_current_user(credentials: Credentials, db: DbSession) -> User:
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
@@ -30,7 +31,13 @@ def get_current_user(
     return user
 
 
-def require_admin(user: User = Depends(get_current_user)) -> User:
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def require_admin(user: CurrentUser) -> User:
     if user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
+
+
+AdminUser = Annotated[User, Depends(require_admin)]

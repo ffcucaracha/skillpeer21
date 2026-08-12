@@ -1,13 +1,17 @@
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import CurrentUser, DbSession
 from app.core.security import create_token, decode_token, hash_password, verify_password
-from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import ChangePasswordRequest, LoginRequest, RefreshRequest, TokenPair, UserRead
+from app.schemas.user import (
+    ChangePasswordRequest,
+    LoginRequest,
+    RefreshRequest,
+    TokenPair,
+    UserRead,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -30,7 +34,7 @@ def _tokens(user: User) -> TokenPair:
 
 
 @router.post("/login", response_model=TokenPair)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
+def login(payload: LoginRequest, db: DbSession) -> TokenPair:
     user = db.scalar(select(User).where(User.login == payload.login))
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -38,7 +42,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
 
 
 @router.post("/refresh", response_model=TokenPair)
-def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPair:
+def refresh(payload: RefreshRequest, db: DbSession) -> TokenPair:
     try:
         claims = decode_token(payload.refresh_token)
         if claims.get("type") != "refresh":
@@ -52,16 +56,12 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPair
 
 
 @router.get("/me", response_model=UserRead)
-def me(user: User = Depends(get_current_user)) -> User:
+def me(user: CurrentUser) -> User:
     return user
 
 
 @router.post("/change-password", response_model=TokenPair)
-def change_password(
-    payload: ChangePasswordRequest,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> TokenPair:
+def change_password(payload: ChangePasswordRequest, user: CurrentUser, db: DbSession) -> TokenPair:
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
     user.password_hash = hash_password(payload.new_password)
