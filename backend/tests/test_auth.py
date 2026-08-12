@@ -84,6 +84,17 @@ def test_admin_can_create_member_and_member_cannot_create_users() -> None:
     assert denied.status_code == 403
 
 
+def test_admin_can_create_user_without_name_and_login_is_used_as_name() -> None:
+    tokens = login("admin", "temporary-admin")
+    response = client.post(
+        "/api/v1/users",
+        headers=auth_header(tokens["access_token"]),
+        json={"login": "peer.without.name", "temporary_password": "temporary-peer"},
+    )
+    assert response.status_code == 201
+    assert response.json()["display_name"] == "peer.without.name"
+
+
 def test_change_password_invalidates_old_token_and_returns_new_pair() -> None:
     tokens = login("admin", "temporary-admin")
     changed = client.post(
@@ -108,16 +119,30 @@ def test_refresh_token_cannot_be_used_as_access_token() -> None:
     assert response.status_code == 401
 
 
-def test_user_can_update_telegram_and_visibility() -> None:
+def test_user_can_update_name_telegram_and_visibility() -> None:
     tokens = login("admin", "temporary-admin")
     response = client.patch(
         "/api/v1/auth/me",
         headers=auth_header(tokens["access_token"]),
-        json={"telegram_username": "@skill_peer", "telegram_visibility": "everyone"},
+        json={
+            "display_name": "Анна",
+            "telegram_username": "@skill_peer",
+            "telegram_visibility": "everyone",
+        },
     )
     assert response.status_code == 200
+    assert response.json()["display_name"] == "Анна"
     assert response.json()["telegram_username"] == "skill_peer"
     assert response.json()["telegram_visibility"] == "everyone"
 
-    me = client.get("/api/v1/auth/me", headers=auth_header(tokens["access_token"]))
-    assert me.json()["telegram_username"] == "skill_peer"
+    reset_name = client.patch(
+        "/api/v1/auth/me",
+        headers=auth_header(tokens["access_token"]),
+        json={
+            "display_name": "",
+            "telegram_username": "skill_peer",
+            "telegram_visibility": "everyone",
+        },
+    )
+    assert reset_name.status_code == 200
+    assert reset_name.json()["display_name"] == "admin"
