@@ -2,7 +2,8 @@ import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, clearTokens, getAccessToken, saveTokens, type Skill } from "./api";
 
-type IconName = "spark" | "people" | "book" | "teach" | "learn" | "plus" | "logout" | "arrow";
+type SkillIntent = "teach" | "learn";
+type IconName = "spark" | "people" | "book" | "teach" | "learn" | "plus" | "logout" | "arrow" | "calendar" | "history";
 
 function Icon({ name }: { name: IconName }) {
   const common = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8 };
@@ -15,8 +16,14 @@ function Icon({ name }: { name: IconName }) {
     plus: <><path d="M12 5v14M5 12h14" /></>,
     logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5M21 12H9" /></>,
     arrow: <><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></>,
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></>,
+    history: <><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></>,
   };
   return <svg {...common} aria-hidden="true">{paths[name]}</svg>;
+}
+
+function openEvents(mode: "active" | "history" | "create") {
+  window.dispatchEvent(new CustomEvent("skillpeer21-open-events", { detail: mode }));
 }
 
 function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
@@ -54,18 +61,11 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
             <h2>Войти в SkillPeer21</h2>
             <p>Используй логин и временный пароль, выданные администратором.</p>
           </div>
-          <label>
-            Логин
-            <input value={login} onChange={(event) => setLogin(event.target.value)} autoComplete="username" required />
-          </label>
-          <label>
-            Пароль
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
-          </label>
+          <label>Логин<input value={login} onChange={(event) => setLogin(event.target.value)} autoComplete="username" required /></label>
+          <label>Пароль<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
           {mutation.isError && <div className="error-message">Не удалось войти. Проверь логин и пароль.</div>}
           <button className="primary-button" type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? "Входим…" : "Войти"}
-            {!mutation.isPending && <Icon name="arrow" />}
+            {mutation.isPending ? "Входим…" : "Войти"}{!mutation.isPending && <Icon name="arrow" />}
           </button>
         </form>
       </section>
@@ -73,15 +73,15 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
   );
 }
 
-function SkillPicker({ skills, onDone }: { skills: Skill[]; onDone: () => void }) {
+function SkillPicker({ skills, initialIntent, onDone }: { skills: Skill[]; initialIntent: SkillIntent; onDone: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [selectedSkillId, setSelectedSkillId] = useState<number | null>(null);
-  const [intent, setIntent] = useState<"teach" | "learn">("learn");
+  const [intent, setIntent] = useState<SkillIntent>(initialIntent);
 
   const createMutation = useMutation({ mutationFn: () => api.createSkill(name) });
   const linkMutation = useMutation({
-    mutationFn: ({ skillId, skillIntent }: { skillId: number; skillIntent: "teach" | "learn" }) => api.addSkillIntent(skillId, skillIntent),
+    mutationFn: ({ skillId, skillIntent }: { skillId: number; skillIntent: SkillIntent }) => api.addSkillIntent(skillId, skillIntent),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
@@ -119,16 +119,11 @@ function SkillPicker({ skills, onDone }: { skills: Skill[]; onDone: () => void }
   return (
     <div className="skill-editor">
       <div className="intent-toggle" role="group" aria-label="Тип навыка">
-        <button type="button" className={intent === "learn" ? "active" : ""} onClick={() => setIntent("learn")}>
-          <Icon name="learn" /> Хочу научиться
-        </button>
-        <button type="button" className={intent === "teach" ? "active" : ""} onClick={() => setIntent("teach")}>
-          <Icon name="teach" /> Могу научить
-        </button>
+        <button type="button" className={intent === "teach" ? "active" : ""} onClick={() => setIntent("teach")}><Icon name="teach" /> Могу научить</button>
+        <button type="button" className={intent === "learn" ? "active" : ""} onClick={() => setIntent("learn")}><Icon name="learn" /> Хочу научиться</button>
       </div>
       <div className="editor-grid">
-        <label>
-          Выбрать из каталога
+        <label>Выбрать из каталога
           <select value={selectedSkillId ?? ""} onChange={(event) => setSelectedSkillId(event.target.value ? Number(event.target.value) : null)}>
             <option value="">Выбери навык</option>
             {skills.map((skill) => <option key={skill.id} value={skill.id}>{skill.name}</option>)}
@@ -138,10 +133,7 @@ function SkillPicker({ skills, onDone }: { skills: Skill[]; onDone: () => void }
       </div>
       <div className="or-divider"><span>или добавить новый навык</span></div>
       <div className="editor-grid">
-        <label>
-          Новый навык
-          <input placeholder="Например, фотография" value={name} onChange={(event) => setName(event.target.value)} />
-        </label>
+        <label>Новый навык<input placeholder="Например, фотография" value={name} onChange={(event) => setName(event.target.value)} /></label>
         <button className="secondary-button" type="button" onClick={addNewSkill} disabled={!name.trim() || busy}>Создать</button>
       </div>
       {error && <div className="error-message">{error}</div>}
@@ -150,7 +142,7 @@ function SkillPicker({ skills, onDone }: { skills: Skill[]; onDone: () => void }
 }
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [showSkillEditor, setShowSkillEditor] = useState(false);
+  const [editorIntent, setEditorIntent] = useState<SkillIntent | null>(null);
   const userQuery = useQuery({ queryKey: ["me"], queryFn: api.me });
   const dashboardQuery = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard });
   const skillsQuery = useQuery({ queryKey: ["skills"], queryFn: api.skills });
@@ -179,9 +171,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       <aside className="sidebar">
         <div className="logo-row"><div className="brand-mark small">21</div><div><strong>SkillPeer21</strong><span>peer-to-peer learning</span></div></div>
         <nav>
-          <a className="active" href="#dashboard"><Icon name="spark" /> Главная</a>
-          <a href="#skills"><Icon name="book" /> Навыки</a>
-          <a href="#matches"><Icon name="people" /> Совпадения</a>
+          <button className="active" type="button"><Icon name="spark" /><span>Главная</span></button>
+          <button type="button" onClick={() => openEvents("active")}><Icon name="calendar" /><span>Встречи</span></button>
+          <button type="button" onClick={() => openEvents("history")}><Icon name="history" /><span>История встреч</span></button>
         </nav>
         <div className="sidebar-profile">
           <div className="avatar">{user.display_name.slice(0, 2).toUpperCase()}</div>
@@ -193,10 +185,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       <main className="dashboard" id="dashboard">
         <header className="dashboard-header">
           <div><span className="kicker">School 21 · обмен опытом</span><h1>Привет, {firstName}.</h1><p>Посмотри, чему сегодня можно научиться у своих пиров.</p></div>
-          <button className="primary-button compact" type="button" onClick={() => setShowSkillEditor((value) => !value)}><Icon name="plus" /> Добавить навык</button>
         </header>
 
-        {showSkillEditor && <section className="panel editor-panel"><div className="section-heading"><div><span className="kicker">Мой профиль</span><h2>Добавить навык</h2></div><button className="text-button" onClick={() => setShowSkillEditor(false)}>Закрыть</button></div><SkillPicker skills={skillsQuery.data ?? []} onDone={() => setShowSkillEditor(false)} /></section>}
+        {editorIntent && (
+          <section className="panel editor-panel">
+            <div className="section-heading"><div><span className="kicker">Мой профиль</span><h2>{editorIntent === "teach" ? "Добавить то, чему я могу научить" : "Добавить то, чему я хочу научиться"}</h2></div><button className="text-button" onClick={() => setEditorIntent(null)}>Закрыть</button></div>
+            <SkillPicker key={editorIntent} skills={skillsQuery.data ?? []} initialIntent={editorIntent} onDone={() => setEditorIntent(null)} />
+          </section>
+        )}
 
         <section className="metric-grid" aria-label="Статистика сообщества">
           <article className="metric-card accent"><span className="metric-icon"><Icon name="people" /></span><div><span>Участников</span><strong>{dashboard.summary.members_count}</strong><small>внутри сообщества</small></div></article>
@@ -209,7 +205,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           <div className="main-column">
             <div className="section-heading"><div><span className="kicker">Твои совпадения</span><h2>Есть у кого научиться</h2></div><span className="count-badge">{dashboard.matches.length}</span></div>
             {dashboard.matches.length === 0 ? (
-              <div className="empty-state panel"><span className="empty-icon"><Icon name="spark" /></span><h3>Пока нет прямых совпадений</h3><p>Добавь то, чему хочешь научиться. Как только кто-то отметит этот навык как «могу научить», совпадение появится здесь.</p><button className="secondary-button" onClick={() => setShowSkillEditor(true)}>Добавить интерес</button></div>
+              <div className="empty-state panel"><span className="empty-icon"><Icon name="spark" /></span><h3>Пока нет прямых совпадений</h3><p>Добавь навык в «Хочу научиться». Как только кто-то отметит тот же навык как «Могу научить», совпадение появится здесь.</p></div>
             ) : (
               <div className="match-list">
                 {dashboard.matches.map((match, index) => (
@@ -220,7 +216,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                         <div className="teacher-row" key={teacher.id}><div className="avatar soft">{teacher.display_name.slice(0, 2).toUpperCase()}</div><div><strong>{teacher.display_name}</strong><span>{teacher.telegram_username ? `@${teacher.telegram_username}` : "Контакт скрыт настройками профиля"}</span></div>{teacher.telegram_username && <a className="telegram-link" href={`https://t.me/${teacher.telegram_username}`} target="_blank" rel="noreferrer">Написать <Icon name="arrow" /></a>}</div>
                       ))}
                     </div>
-                    <footer><span>{match.learners_count > 1 ? `Ещё ${match.learners_count - 1} участник(а) хотят этому научиться` : "Ты уже можешь собрать первую встречу"}</span><button className="text-button">Создать встречу <Icon name="arrow" /></button></footer>
+                    <footer><span>{match.learners_count > 1 ? `Ещё ${match.learners_count - 1} участник(а) хотят этому научиться` : "Ты уже можешь собрать первую встречу"}</span><button className="text-button" type="button" onClick={() => openEvents("create")}>Создать встречу <Icon name="arrow" /></button></footer>
                   </article>
                 ))}
               </div>
@@ -228,10 +224,16 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           </div>
 
           <aside className="side-column">
-            <section className="panel my-skills" id="skills">
-              <div className="section-heading"><div><span className="kicker">Мой профиль</span><h2>Навыки</h2></div><button className="icon-button bordered" onClick={() => setShowSkillEditor(true)}><Icon name="plus" /></button></div>
-              <div className="skill-group"><span><Icon name="teach" /> Могу научить</span><div className="chip-list">{groupedMySkills.teach.length ? groupedMySkills.teach.map((name) => <span className="chip teach" key={name}>{name}</span>) : <small>Пока ничего не добавлено</small>}</div></div>
-              <div className="skill-group"><span><Icon name="learn" /> Хочу научиться</span><div className="chip-list">{groupedMySkills.learn.length ? groupedMySkills.learn.map((name) => <span className="chip learn" key={name}>{name}</span>) : <small>Пока ничего не добавлено</small>}</div></div>
+            <section className="panel my-skills">
+              <div className="section-heading"><div><span className="kicker">Мой профиль</span><h2>Навыки</h2></div></div>
+              <div className="skill-group">
+                <div className="skill-group-heading"><span><Icon name="teach" /> Могу научить</span><button className="icon-button bordered compact-plus" type="button" onClick={() => setEditorIntent("teach")} aria-label="Добавить навык, которому могу научить"><Icon name="plus" /></button></div>
+                <div className="chip-list">{groupedMySkills.teach.length ? groupedMySkills.teach.map((name) => <span className="chip teach" key={name}>{name}</span>) : <small>Пока ничего не добавлено</small>}</div>
+              </div>
+              <div className="skill-group">
+                <div className="skill-group-heading"><span><Icon name="learn" /> Хочу научиться</span><button className="icon-button bordered compact-plus" type="button" onClick={() => setEditorIntent("learn")} aria-label="Добавить навык, которому хочу научиться"><Icon name="plus" /></button></div>
+                <div className="chip-list">{groupedMySkills.learn.length ? groupedMySkills.learn.map((name) => <span className="chip learn" key={name}>{name}</span>) : <small>Пока ничего не добавлено</small>}</div>
+              </div>
             </section>
           </aside>
         </section>
