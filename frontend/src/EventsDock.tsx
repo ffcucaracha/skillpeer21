@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, getAccessToken, onAuthChange, type CommunityEvent } from "./api";
 import "./events.css";
 
+type EventsMode = "active" | "history" | "create";
+
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",
@@ -15,6 +17,7 @@ function formatDate(value: string): string {
 function statusLabel(status: CommunityEvent["status"]): string {
   if (status === "confirmed") return "Время выбрано";
   if (status === "completed") return "Завершена";
+  if (status === "cancelled") return "Отменена";
   return "Ищем время";
 }
 
@@ -38,12 +41,9 @@ function EventCard({ event, currentUserId }: { event: CommunityEvent; currentUse
   const confirmedOption = event.time_options.find((option) => option.id === event.confirmed_time_option_id);
 
   return (
-    <article className={`event-card ${event.status === "completed" ? "completed" : ""}`}>
+    <article className={`event-card ${event.status}`}>
       <div className="event-card-head">
-        <div>
-          <span className="event-skill">{event.skill_name}</span>
-          <h3>{event.title}</h3>
-        </div>
+        <div><span className="event-skill">{event.skill_name}</span><h3>{event.title}</h3></div>
         <span className={`event-status ${event.status}`}>{statusLabel(event.status)}</span>
       </div>
       {event.description && <p className="event-description">{event.description}</p>}
@@ -61,12 +61,7 @@ function EventCard({ event, currentUserId }: { event: CommunityEvent; currentUse
                 <span className="kudos-avatar">{person.display_name.slice(0, 2).toUpperCase()}</span>
                 <span className="kudos-name"><strong>{person.display_name}</strong><small>{person.role === "teacher" ? "преподаватель" : "участник"} · ♥ {person.kudos_received}</small></span>
                 {person.user_id !== currentUserId && participant && (
-                  <button
-                    type="button"
-                    className={person.kudos_given_by_me ? "kudos-button given" : "kudos-button"}
-                    disabled={person.kudos_given_by_me || kudos.isPending}
-                    onClick={() => kudos.mutate(person.user_id)}
-                  >
+                  <button type="button" className={person.kudos_given_by_me ? "kudos-button given" : "kudos-button"} disabled={person.kudos_given_by_me || kudos.isPending} onClick={() => kudos.mutate(person.user_id)}>
                     {person.kudos_given_by_me ? "Спасибо ✓" : "Дать kudos"}
                   </button>
                 )}
@@ -74,14 +69,12 @@ function EventCard({ event, currentUserId }: { event: CommunityEvent; currentUse
             ))}
           </div>
         </div>
+      ) : event.status === "cancelled" ? (
+        <div className="cancelled-note">Эта встреча отменена.</div>
       ) : event.status === "confirmed" && confirmedOption ? (
         <>
           <div className="confirmed-slot"><strong>{formatDate(confirmedOption.starts_at)}</strong><span>встреча подтверждена</span></div>
-          {isCreator && (
-            <button className="complete-event" type="button" disabled={complete.isPending} onClick={() => complete.mutate()}>
-              {complete.isPending ? "Завершаем…" : "Отметить встречу завершённой"}
-            </button>
-          )}
+          {isCreator && <button className="complete-event" type="button" disabled={complete.isPending} onClick={() => complete.mutate()}>{complete.isPending ? "Завершаем…" : "Отметить встречу завершённой"}</button>}
         </>
       ) : (
         <div className="slot-list">
@@ -91,19 +84,13 @@ function EventCard({ event, currentUserId }: { event: CommunityEvent; currentUse
                 <span className="slot-check">{option.voted_by_me ? "✓" : ""}</span>
                 <span><strong>{formatDate(option.starts_at)}</strong><small>{option.votes_count} голосов{option.teacher_voted ? " · преподаватель может" : ""}</small></span>
               </button>
-              {isCreator && option.teacher_voted && (
-                <button className="confirm-slot" type="button" disabled={confirm.isPending} onClick={() => confirm.mutate(option.id)}>Выбрать</button>
-              )}
+              {isCreator && option.teacher_voted && <button className="confirm-slot" type="button" disabled={confirm.isPending} onClick={() => confirm.mutate(option.id)}>Выбрать</button>}
             </div>
           ))}
         </div>
       )}
 
-      {!participant && event.status === "scheduling" && (
-        <button className="event-secondary" type="button" disabled={join.isPending} onClick={() => join.mutate()}>
-          Присоединиться и голосовать
-        </button>
-      )}
+      {!participant && event.status === "scheduling" && <button className="event-secondary" type="button" disabled={join.isPending} onClick={() => join.mutate()}>Присоединиться и голосовать</button>}
       {error && <div className="event-error">{error}</div>}
     </article>
   );
@@ -145,28 +132,13 @@ function CreateEvent({ onDone }: { onDone: () => void }) {
   return (
     <form className="event-create" onSubmit={submit}>
       <div className="event-form-title"><span>Новая встреча</span><strong>Собери пиров вокруг навыка</strong></div>
-      {matches.length === 0 ? (
-        <div className="event-empty-note">Сначала добавь навык, которому хочешь научиться, и дождись совпадения с преподавателем.</div>
-      ) : (
+      {matches.length === 0 ? <div className="event-empty-note">Сначала добавь навык, которому хочешь научиться, и дождись совпадения с преподавателем.</div> : (
         <>
-          <label>Навык
-            <select value={matchIndex} onChange={(e) => { setMatchIndex(e.target.value); setTeacherId(""); }} required>
-              <option value="">Выбери навык</option>
-              {matches.map((match, index) => <option key={match.skill_id} value={index}>{match.skill_name}</option>)}
-            </select>
-          </label>
-          <label>Преподаватель
-            <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} required disabled={!selectedMatch}>
-              <option value="">Выбери пира</option>
-              {selectedMatch?.teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.display_name}</option>)}
-            </select>
-          </label>
+          <label>Навык<select value={matchIndex} onChange={(e) => { setMatchIndex(e.target.value); setTeacherId(""); }} required><option value="">Выбери навык</option>{matches.map((match, index) => <option key={match.skill_id} value={index}>{match.skill_name}</option>)}</select></label>
+          <label>Преподаватель<select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} required disabled={!selectedMatch}><option value="">Выбери пира</option>{selectedMatch?.teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.display_name}</option>)}</select></label>
           <label>Название встречи<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, Гитара с нуля" minLength={3} required /></label>
           <label>Что хотите разобрать<textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Коротко опиши цель первой встречи" rows={3} /></label>
-          <div className="time-grid">
-            <label>Вариант 1<input type="datetime-local" value={firstTime} onChange={(e) => setFirstTime(e.target.value)} required /></label>
-            <label>Вариант 2<input type="datetime-local" value={secondTime} onChange={(e) => setSecondTime(e.target.value)} required /></label>
-          </div>
+          <div className="time-grid"><label>Вариант 1<input type="datetime-local" value={firstTime} onChange={(e) => setFirstTime(e.target.value)} required /></label><label>Вариант 2<input type="datetime-local" value={secondTime} onChange={(e) => setSecondTime(e.target.value)} required /></label></div>
           {mutation.isError && <div className="event-error">{mutation.error.message}</div>}
           <button className="event-primary" type="submit" disabled={mutation.isPending}>{mutation.isPending ? "Создаём…" : "Создать встречу"}</button>
         </>
@@ -178,36 +150,49 @@ function CreateEvent({ onDone }: { onDone: () => void }) {
 export default function EventsDock() {
   const [authenticated, setAuthenticated] = useState(Boolean(getAccessToken()));
   const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [mode, setMode] = useState<EventsMode>("active");
 
   useEffect(() => onAuthChange(() => setAuthenticated(Boolean(getAccessToken()))), []);
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<EventsMode>).detail;
+      setMode(detail || "active");
+      setOpen(true);
+    };
+    window.addEventListener("skillpeer21-open-events", handler);
+    return () => window.removeEventListener("skillpeer21-open-events", handler);
+  }, []);
 
   const me = useQuery({ queryKey: ["me-events"], queryFn: api.me, enabled: authenticated });
   const events = useQuery({ queryKey: ["events"], queryFn: api.events, enabled: authenticated });
-
   const allEvents = useMemo(() => events.data ?? [], [events.data]);
-  const activeCount = allEvents.filter((event) => event.status !== "completed").length;
-  if (!authenticated || !me.data) return null;
+  const visibleEvents = mode === "history"
+    ? allEvents.filter((event) => event.status === "completed" || event.status === "cancelled")
+    : allEvents.filter((event) => event.status === "scheduling" || event.status === "confirmed");
+
+  if (!authenticated || !me.data || !open) return null;
 
   return (
-    <div className={`events-dock ${open ? "open" : ""}`}>
-      <button className="events-launcher" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
-        <span className="launcher-icon">↗</span>
-        <span><strong>Встречи</strong><small>{activeCount ? `${activeCount} активных` : "организовать"}</small></span>
-      </button>
-      {open && (
-        <section className="events-panel" aria-label="Встречи SkillPeer21">
-          <header><div><span>SkillPeer21</span><h2>Встречи</h2></div><button type="button" onClick={() => setCreating((value) => !value)}>{creating ? "К списку" : "+ Создать"}</button></header>
-          {creating ? <CreateEvent onDone={() => setCreating(false)} /> : (
-            <div className="events-list">
-              {events.isLoading && <div className="event-empty-note">Загружаем встречи…</div>}
-              {events.isError && <div className="event-error">Не удалось загрузить встречи.</div>}
-              {!events.isLoading && allEvents.length === 0 && <div className="events-empty"><div>21</div><strong>Пока тихо</strong><p>Создай первую встречу вокруг навыка, для которого уже нашёлся преподаватель.</p><button type="button" onClick={() => setCreating(true)}>Создать встречу</button></div>}
-              {allEvents.map((event) => <EventCard key={event.id} event={event} currentUserId={me.data.id} />)}
-            </div>
-          )}
-        </section>
-      )}
+    <div className="events-drawer-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) setOpen(false); }}>
+      <section className="events-panel events-drawer" aria-label="Встречи SkillPeer21">
+        <header className="events-drawer-header">
+          <div><span>SkillPeer21</span><h2>{mode === "history" ? "История встреч" : mode === "create" ? "Новая встреча" : "Встречи"}</h2></div>
+          <button className="drawer-close" type="button" onClick={() => setOpen(false)} aria-label="Закрыть">×</button>
+        </header>
+        <div className="events-tabs">
+          <button type="button" className={mode === "active" ? "active" : ""} onClick={() => setMode("active")}>Встречи</button>
+          <button type="button" className={mode === "history" ? "active" : ""} onClick={() => setMode("history")}>История</button>
+          <button type="button" className={mode === "create" ? "active create" : "create"} onClick={() => setMode("create")}>+ Создать</button>
+        </div>
+        {mode === "create" ? <CreateEvent onDone={() => setMode("active")} /> : (
+          <div className="events-list">
+            {events.isLoading && <div className="event-empty-note">Загружаем встречи…</div>}
+            {events.isError && <div className="event-error">Не удалось загрузить встречи.</div>}
+            {!events.isLoading && visibleEvents.length === 0 && <div className="events-empty"><div>21</div><strong>{mode === "history" ? "История пока пуста" : "Пока тихо"}</strong><p>{mode === "history" ? "Завершённые и отменённые встречи появятся здесь." : "Создай первую встречу вокруг навыка, для которого уже нашёлся преподаватель."}</p>{mode === "active" && <button type="button" onClick={() => setMode("create")}>Создать встречу</button>}</div>}
+            {visibleEvents.map((event) => <EventCard key={event.id} event={event} currentUserId={me.data.id} />)}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
