@@ -78,6 +78,47 @@ def auth(value: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {value}"}
 
 
+def create_confirmed_event() -> tuple[int, int, int, str, str, str]:
+    learner_token = token("learner", "temporary-learner")
+    teacher_token = token("teacher", "temporary-teacher")
+    another_token = token("another", "temporary-another")
+
+    with TestingSession() as db:
+        skill_id = db.query(Skill).filter_by(normalized_name="гитара").one().id
+        teacher_id = db.query(User).filter_by(login="teacher").one().id
+
+    first = datetime.now(UTC) + timedelta(days=1)
+    second = datetime.now(UTC) + timedelta(days=2)
+    created = client.post(
+        "/api/v1/events",
+        headers=auth(learner_token),
+        json={
+            "skill_id": skill_id,
+            "teacher_id": teacher_id,
+            "title": "Первая встреча по гитаре",
+            "description": "Разберём базовые аккорды.",
+            "time_options": [first.isoformat(), second.isoformat()],
+        },
+    )
+    assert created.status_code == 201
+    event = created.json()
+    event_id = event["id"]
+    option_id = event["time_options"][0]["id"]
+
+    assert client.post(f"/api/v1/events/{event_id}/join", headers=auth(another_token)).status_code == 200
+    assert client.post(
+        f"/api/v1/events/{event_id}/time-options/{option_id}/vote",
+        headers=auth(teacher_token),
+    ).status_code == 200
+    confirmed = client.post(
+        f"/api/v1/events/{event_id}/confirm",
+        headers=auth(learner_token),
+        json={"time_option_id": option_id},
+    )
+    assert confirmed.status_code == 200
+    return event_id, teacher_id, option_id, learner_token, teacher_token, another_token
+
+
 def test_event_flow_requires_teacher_availability_before_confirmation() -> None:
     learner_token = token("learner", "temporary-learner")
     teacher_token = token("teacher", "temporary-teacher")
@@ -142,6 +183,49 @@ def test_event_flow_requires_teacher_availability_before_confirmation() -> None:
     assert confirmed.status_code == 200
     assert confirmed.json()["status"] == "confirmed"
     assert confirmed.json()["confirmed_time_option_id"] == option_id
+
+
+def test_completed_event_allows_one_kudos_per_participant_pair() -> None:
+    event_id, teacher_id, _, learner_token, teacher_token, another_token = create_confirmed_event()
+
+    forbidden = client.post(f"/api/v1/events/{event_id}/complete", headers=auth(teacher_token))
+    assert forbidden.status_code == 403
+
+    completed = client.post(f"/api/v1/events/{event_id}/complete", headers=auth(learner_token))
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "completed"
+
+    kudos = client.post(
+        f"/api/v1/events/{event_id}/kudos/{teacher_id}",
+        headers=auth(learner_token),
+    )
+    assert kudos.status_code == 200
+    teacher = next(row for row in kudos.json()["participants"] if row["user_id"] == teacher_id)
+    assert teacher["kudos_received"] == 1
+    assert teacher["kudos_given_by_me"] is True
+
+    duplicate = client.post(
+        f"/api/v1/events/{event_id}/kudos/{teacher_id}",
+        headers=auth(learner_token),
+    )
+    assert duplicate.status_code == 409
+
+    with TestingSession() as db:
+        another_id = db.query(User).filter_by(login="another").one().id
+    self_kudos = client.post(
+        f"/api/v1/events/{event_id}/kudos/{another_id}",
+        headers=auth(another_token),
+    )
+    assert self_kudos.status_code == 422
+
+
+def test_kudos_are_not_available_before_completion() -> None:
+    event_id, teacher_id, _, learner_token, _, _ = create_confirmed_event()
+    response = client.post(
+        f"/api/v1/events/{event_id}/kudos/{teacher_id}",
+        headers=auth(learner_token),
+    )
+    assert response.status_code == 409
 
 
 def test_event_cannot_use_user_who_does_not_teach_skill() -> None:
