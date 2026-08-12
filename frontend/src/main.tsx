@@ -9,6 +9,7 @@ import "./styles.css";
 import "./community.css";
 import "./events-drawer.css";
 import "./profile.css";
+import "./brand.css";
 
 const queryClient = new QueryClient();
 
