@@ -63,6 +63,7 @@ def me(user: CurrentUser) -> User:
 
 @router.patch("/me", response_model=UserRead)
 def update_me(payload: UserProfileUpdate, user: CurrentUser, db: DbSession) -> User:
+    user.display_name = payload.display_name or user.login
     user.telegram_username = payload.telegram_username
     user.telegram_visibility = payload.telegram_visibility
     db.commit()
