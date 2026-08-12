@@ -1,127 +1,47 @@
-:root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #171717;
-  background: #f6f7f4;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  --ink: #171717;
-  --muted: #737373;
-  --line: #e7e8e2;
-  --surface: #ffffff;
-  --soft: #f1f2ed;
-  --green: #36d987;
-  --green-dark: #163d2b;
-  --green-soft: #e7faef;
-  --blue-soft: #edf4ff;
-  --blue: #3c6fd8;
-}
-
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: #f6f7f4; }
-button, input, textarea, select { font: inherit; }
-button, a { -webkit-tap-highlight-color: transparent; }
+:root { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #161816; background: #f7f8f4; font-synthesis: none; text-rendering: optimizeLegibility; --green: #36d987; --green-soft: #e7faef; --ink: #171a18; --muted: #7a807a; --line: #e3e5df; --surface: #fff; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: #f7f8f4; }
+button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3, p { margin: 0; }
 
-.brand-mark {
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  background: var(--green);
-  color: #082518;
-  font-weight: 900;
-  font-size: 1.35rem;
-  letter-spacing: -0.06em;
-}
-.brand-mark.small { width: 42px; height: 42px; border-radius: 13px; font-size: 1rem; }
+.login-page { min-height: 100vh; display: grid; grid-template-columns: 1.1fr .9fr; background: #fff; }
+.login-brand { padding: clamp(42px, 7vw, 92px); background: #18201b; color: #fff; display: flex; flex-direction: column; align-items: flex-start; }
+.brand-mark { width: 54px; height: 54px; border-radius: 16px; background: var(--green); color: #07331f; display: grid; place-items: center; font-weight: 900; font-size: 1.1rem; }
+.brand-mark.small { width: 36px; height: 36px; border-radius: 11px; font-size: .82rem; }
+.login-brand > span { margin-top: 22px; text-transform: uppercase; letter-spacing: .15em; color: #91a298; font-size: .72rem; font-weight: 800; }
+.login-brand h1 { margin-top: 46px; max-width: 620px; font-size: clamp(2.6rem, 5vw, 5rem); line-height: .98; letter-spacing: -.06em; font-weight: 620; }
+.login-brand p { margin-top: 26px; max-width: 540px; color: #b6c1b9; font-size: 1rem; line-height: 1.7; }
+.brand-points { margin-top: auto; display: flex; flex-wrap: wrap; gap: 10px 22px; color: #b7c6bc; font-size: .8rem; }
+.brand-points span { display: flex; align-items: center; gap: 8px; }
+.brand-points svg { width: 18px; height: 18px; color: var(--green); }
+.login-panel { display: grid; place-items: center; padding: 48px; }
+.login-card { width: min(390px, 100%); display: grid; gap: 18px; }
+.login-card .kicker, .kicker { text-transform: uppercase; letter-spacing: .13em; font-size: .69rem; font-weight: 850; color: #727871; }
+.login-card h2 { margin-top: 6px; font-size: 2rem; letter-spacing: -.045em; }
+.login-card p { margin-top: 7px; color: var(--muted); font-size: .85rem; line-height: 1.6; }
+label { display: grid; gap: 7px; color: #5b615b; font-size: .78rem; font-weight: 700; }
+input, select, textarea { width: 100%; border: 1px solid #d7dad4; border-radius: 11px; padding: 11px 12px; background: #fff; color: #222; outline: none; }
+input:focus, select:focus, textarea:focus { border-color: #7bc79e; box-shadow: 0 0 0 3px rgba(54,217,135,.11); }
+.primary-button, .secondary-button { min-height: 44px; border: 0; border-radius: 12px; padding: 0 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; }
+.primary-button { background: #191d1a; color: #fff; }
+.primary-button:hover { background: #282d29; }
+.primary-button:disabled, .secondary-button:disabled { opacity: .5; cursor: not-allowed; }
+.primary-button.compact { min-height: 42px; }
+.secondary-button { background: #eef0eb; color: #343934; }
+.error-message { border-radius: 10px; padding: 10px 12px; background: #fee9e7; color: #9e342c; font-size: .78rem; }
 
-.login-page { min-height: 100vh; display: grid; grid-template-columns: 1.1fr 0.9fr; }
-.login-brand {
-  padding: clamp(40px, 7vw, 96px);
-  background: #151716;
-  color: white;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-}
-.login-brand::after {
-  content: "";
-  position: absolute;
-  width: 440px;
-  height: 440px;
-  right: -180px;
-  bottom: -180px;
-  border: 90px solid rgba(54, 217, 135, 0.08);
-  border-radius: 50%;
-}
-.login-brand > span { margin-top: 22px; color: #a9aea9; font-size: .9rem; }
-.login-brand h1 { max-width: 720px; margin-top: 44px; font-size: clamp(2.7rem, 5vw, 5.2rem); line-height: .98; letter-spacing: -.055em; font-weight: 650; }
-.login-brand p { max-width: 600px; margin-top: 28px; color: #b9bdb9; font-size: 1.08rem; line-height: 1.7; }
-.brand-points { margin-top: 46px; display: grid; gap: 14px; color: #dce0dc; }
-.brand-points span { display: flex; gap: 12px; align-items: center; }
-.brand-points svg { color: var(--green); }
-.login-panel { display: grid; place-items: center; padding: 40px; }
-.login-card { width: min(430px, 100%); display: grid; gap: 24px; }
-.login-card h2 { margin-top: 7px; font-size: 2rem; letter-spacing: -.04em; }
-.login-card p { margin-top: 10px; color: var(--muted); line-height: 1.6; }
-.login-card label, .skill-editor label { display: grid; gap: 8px; font-size: .88rem; font-weight: 650; color: #343434; }
-input, select {
-  width: 100%;
-  min-height: 48px;
-  padding: 0 14px;
-  border: 1px solid #dcded7;
-  border-radius: 13px;
-  background: #fff;
-  outline: none;
-  transition: border-color .16s, box-shadow .16s;
-}
-input:focus, select:focus { border-color: #92d8b3; box-shadow: 0 0 0 4px rgba(54, 217, 135, .11); }
-.kicker { font-size: .74rem; text-transform: uppercase; letter-spacing: .12em; font-weight: 800; color: #777c76; }
-.primary-button, .secondary-button {
-  border: 0;
-  border-radius: 13px;
-  min-height: 48px;
-  padding: 0 17px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-weight: 750;
-  transition: transform .15s, opacity .15s, background .15s;
-}
-.primary-button { background: #181b19; color: white; }
-.primary-button:hover { background: #252925; transform: translateY(-1px); }
-.primary-button.compact { min-height: 43px; padding: 0 15px; font-size: .9rem; }
-.secondary-button { background: var(--soft); color: #262a27; }
-.secondary-button:hover { background: #e9ebe4; }
-button:disabled { cursor: not-allowed; opacity: .5; transform: none !important; }
-.error-message { padding: 12px 14px; border-radius: 12px; background: #fff0ee; color: #9a3027; font-size: .88rem; }
-
-.app-shell { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
-.sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  padding: 26px 18px;
-  border-right: 1px solid var(--line);
-  background: rgba(250, 251, 248, .94);
-  display: flex;
-  flex-direction: column;
-}
-.logo-row { display: flex; gap: 12px; align-items: center; padding: 0 7px; }
-.logo-row > div:last-child { display: grid; gap: 2px; }
-.logo-row strong { font-size: .96rem; letter-spacing: -.02em; }
+.app-shell { min-height: 100vh; display: grid; grid-template-columns: 245px minmax(0,1fr); }
+.sidebar { position: sticky; top: 0; height: 100vh; padding: 27px 20px 20px; border-right: 1px solid var(--line); background: rgba(250,251,247,.92); display: flex; flex-direction: column; }
+.logo-row { display: flex; align-items: center; gap: 11px; }
+.logo-row > div:last-child { display: grid; gap: 1px; }
+.logo-row strong { font-size: .9rem; }
 .logo-row span { color: #8c918b; font-size: .69rem; }
 .sidebar nav { display: grid; gap: 5px; margin-top: 42px; }
-.sidebar nav a { display: flex; align-items: center; gap: 11px; padding: 11px 12px; border-radius: 11px; color: #747974; font-size: .9rem; font-weight: 600; }
-.sidebar nav a:hover { background: #f0f1ed; color: #333; }
-.sidebar nav a.active { background: #e5f9ed; color: #174b31; }
+.sidebar nav a, .sidebar nav button { width: 100%; border: 0; display: flex; align-items: center; gap: 11px; padding: 11px 12px; border-radius: 11px; background: transparent; color: #747974; font-size: .9rem; font-weight: 600; text-align: left; }
+.sidebar nav a:hover, .sidebar nav button:hover { background: #f0f1ed; color: #333; }
+.sidebar nav a.active, .sidebar nav button.active { background: #e5f9ed; color: #174b31; }
 .sidebar-profile { margin-top: auto; padding: 15px 8px 4px; border-top: 1px solid var(--line); display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
 .sidebar-profile > div:nth-child(2) { min-width: 0; display: grid; gap: 2px; }
 .sidebar-profile strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: .82rem; }
@@ -131,6 +51,8 @@ button:disabled { cursor: not-allowed; opacity: .5; transform: none !important; 
 .icon-button { width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; display: grid; place-items: center; color: #757a75; }
 .icon-button:hover { background: #eceee9; color: #222; }
 .icon-button.bordered { border: 1px solid var(--line); background: #fff; }
+.icon-button.compact-plus { width: 30px; height: 30px; border-radius: 9px; }
+.icon-button.compact-plus svg { width: 16px; height: 16px; }
 
 .dashboard { width: min(1320px, 100%); margin: 0 auto; padding: 38px 48px 72px; }
 .dashboard-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
@@ -188,11 +110,11 @@ button:disabled { cursor: not-allowed; opacity: .5; transform: none !important; 
 .empty-icon { width: 48px; height: 48px; border-radius: 15px; background: var(--green-soft); color: #28744b; display: grid; place-items: center; }
 .empty-state h3 { margin-top: 5px; }
 .empty-state p { max-width: 520px; color: var(--muted); font-size: .87rem; line-height: 1.6; }
-.empty-state .secondary-button { margin-top: 5px; min-height: 40px; }
 .my-skills { padding: 20px; position: sticky; top: 24px; }
 .skill-group { margin-top: 20px; }
-.skill-group > span { display: flex; gap: 7px; align-items: center; color: #5c625d; font-size: .77rem; font-weight: 750; }
-.skill-group svg { width: 17px; height: 17px; }
+.skill-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.skill-group-heading > span { display: flex; gap: 7px; align-items: center; color: #5c625d; font-size: .77rem; font-weight: 750; }
+.skill-group-heading svg { width: 17px; height: 17px; }
 .chip-list { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 7px; }
 .chip { padding: 7px 9px; border-radius: 9px; font-size: .74rem; font-weight: 650; }
 .chip.teach { background: #edf8f1; color: #357051; }
@@ -228,8 +150,8 @@ button:disabled { cursor: not-allowed; opacity: .5; transform: none !important; 
   .app-shell { display: block; }
   .sidebar { position: static; height: auto; padding: 14px 18px; border-right: 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18px; }
   .sidebar nav { margin: 0; display: flex; justify-content: center; }
-  .sidebar nav a { padding: 9px; }
-  .sidebar nav a:not(.active) span { display: none; }
+  .sidebar nav a, .sidebar nav button { width: auto; padding: 9px; }
+  .sidebar nav button span { display: none; }
   .sidebar-profile { margin: 0; padding: 0; border: 0; }
   .sidebar-profile > div:nth-child(2) { display: none; }
   .dashboard { padding: 28px 22px 58px; }
@@ -239,7 +161,6 @@ button:disabled { cursor: not-allowed; opacity: .5; transform: none !important; 
 
 @media (max-width: 620px) {
   .dashboard-header { align-items: flex-start; flex-direction: column; }
-  .dashboard-header .primary-button { width: 100%; }
   .metric-grid { grid-template-columns: 1fr 1fr; gap: 9px; }
   .metric-card { padding: 14px; gap: 9px; }
   .metric-icon { display: none; }
@@ -253,6 +174,4 @@ button:disabled { cursor: not-allowed; opacity: .5; transform: none !important; 
   .editor-grid .secondary-button { width: 100%; }
   .intent-toggle { width: 100%; }
   .intent-toggle button { flex: 1; justify-content: center; }
-  .sidebar nav a { font-size: 0; }
-  .sidebar nav a svg { width: 20px; height: 20px; }
 }
