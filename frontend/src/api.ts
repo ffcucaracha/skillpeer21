@@ -75,6 +75,8 @@ export type CommunityEvent = {
     user_id: number;
     display_name: string;
     role: "teacher" | "learner";
+    kudos_received: number;
+    kudos_given_by_me: boolean;
   }>;
   time_options: EventTimeOption[];
   created_at: string;
@@ -168,4 +170,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ time_option_id: optionId }),
     }),
+  completeEvent: (eventId: number) =>
+    request<CommunityEvent>(`/events/${eventId}/complete`, { method: "POST" }),
+  giveKudos: (eventId: number, recipientId: number) =>
+    request<CommunityEvent>(`/events/${eventId}/kudos/${recipientId}`, { method: "POST" }),
 };

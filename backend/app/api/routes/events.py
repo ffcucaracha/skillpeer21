@@ -13,6 +13,7 @@ from app.models.event import (
     EventTimeOption,
     EventTimeVote,
 )
+from app.models.kudos import Kudos
 from app.models.skill import Skill, SkillIntent, UserSkill
 from app.models.user import User
 from app.schemas.event import (
@@ -34,6 +35,26 @@ def _event_read(db: DbSession, event: Event, current_user_id: int) -> EventRead:
         .where(EventParticipant.event_id == event.id)
         .order_by(EventParticipant.role.desc(), User.display_name)
     ).all()
+
+    participant_ids = [participant.user_id for participant, _ in participant_rows]
+    kudos_counts: dict[int, int] = {}
+    my_kudos: set[int] = set()
+    if participant_ids:
+        kudos_counts = dict(
+            db.execute(
+                select(Kudos.recipient_id, func.count(Kudos.id))
+                .where(Kudos.event_id == event.id, Kudos.recipient_id.in_(participant_ids))
+                .group_by(Kudos.recipient_id)
+            ).all()
+        )
+        my_kudos = set(
+            db.scalars(
+                select(Kudos.recipient_id).where(
+                    Kudos.event_id == event.id,
+                    Kudos.sender_id == current_user_id,
+                )
+            ).all()
+        )
 
     options = list(
         db.scalars(
@@ -82,7 +103,13 @@ def _event_read(db: DbSession, event: Event, current_user_id: int) -> EventRead:
         status=event.status,
         confirmed_time_option_id=event.confirmed_time_option_id,
         participants=[
-            EventParticipantRead(user_id=participant.user_id, display_name=name, role=participant.role)
+            EventParticipantRead(
+                user_id=participant.user_id,
+                display_name=name,
+                role=participant.role,
+                kudos_received=kudos_counts.get(participant.user_id, 0),
+                kudos_given_by_me=participant.user_id in my_kudos,
+            )
             for participant, name in participant_rows
         ],
         time_options=[
@@ -104,7 +131,7 @@ def list_events(user: CurrentUser, db: DbSession) -> list[EventRead]:
     events = list(
         db.scalars(
             select(Event)
-            .where(Event.status.in_([EventStatus.SCHEDULING, EventStatus.CONFIRMED]))
+            .where(Event.status != EventStatus.CANCELLED)
             .order_by(Event.created_at.desc())
         ).all()
     )
@@ -247,6 +274,66 @@ def confirm_event(
     return _event_read(db, event, user.id)
 
 
+@router.post("/{event_id}/complete", response_model=EventRead)
+def complete_event(event_id: int, user: CurrentUser, db: DbSession) -> EventRead:
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    if event.creator_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the creator can complete the event")
+    if event.status != EventStatus.CONFIRMED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only a confirmed event can be completed",
+        )
+    event.status = EventStatus.COMPLETED
+    db.commit()
+    db.refresh(event)
+    return _event_read(db, event, user.id)
+
+
+@router.post("/{event_id}/kudos/{recipient_id}", response_model=EventRead)
+def give_kudos(
+    event_id: int,
+    recipient_id: int,
+    user: CurrentUser,
+    db: DbSession,
+) -> EventRead:
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    if event.status != EventStatus.COMPLETED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Kudos are available after completion")
+    if recipient_id == user.id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="You cannot give kudos to yourself")
+
+    sender_participant = db.scalar(
+        select(EventParticipant.id).where(
+            EventParticipant.event_id == event.id,
+            EventParticipant.user_id == user.id,
+        )
+    )
+    recipient_participant = db.scalar(
+        select(EventParticipant.id).where(
+            EventParticipant.event_id == event.id,
+            EventParticipant.user_id == recipient_id,
+        )
+    )
+    if sender_participant is None or recipient_participant is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Kudos can only be exchanged between event participants",
+        )
+
+    db.add(Kudos(event_id=event.id, sender_id=user.id, recipient_id=recipient_id))
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Kudos already given") from exc
+    return _event_read(db, event, user.id)
+
+
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 def cancel_event(event_id: int, user: CurrentUser, db: DbSession) -> Response:
     event = db.get(Event, event_id)
@@ -254,6 +341,8 @@ def cancel_event(event_id: int, user: CurrentUser, db: DbSession) -> Response:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
     if event.creator_id != user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the creator can cancel the event")
+    if event.status == EventStatus.COMPLETED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Completed event cannot be cancelled")
     event.status = EventStatus.CANCELLED
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

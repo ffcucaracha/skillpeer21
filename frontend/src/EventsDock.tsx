@@ -12,6 +12,12 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
+function statusLabel(status: CommunityEvent["status"]): string {
+  if (status === "confirmed") return "Время выбрано";
+  if (status === "completed") return "Завершена";
+  return "Ищем время";
+}
+
 function EventCard({ event, currentUserId }: { event: CommunityEvent; currentUserId: number }) {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -26,17 +32,19 @@ function EventCard({ event, currentUserId }: { event: CommunityEvent; currentUse
   const join = useMutation({ mutationFn: () => api.joinEvent(event.id), onSuccess: refresh, onError: (e: Error) => setError(e.message) });
   const vote = useMutation({ mutationFn: (optionId: number) => api.voteEventTime(event.id, optionId), onSuccess: refresh, onError: (e: Error) => setError(e.message) });
   const confirm = useMutation({ mutationFn: (optionId: number) => api.confirmEventTime(event.id, optionId), onSuccess: refresh, onError: (e: Error) => setError(e.message) });
+  const complete = useMutation({ mutationFn: () => api.completeEvent(event.id), onSuccess: refresh, onError: (e: Error) => setError(e.message) });
+  const kudos = useMutation({ mutationFn: (recipientId: number) => api.giveKudos(event.id, recipientId), onSuccess: refresh, onError: (e: Error) => setError(e.message) });
 
   const confirmedOption = event.time_options.find((option) => option.id === event.confirmed_time_option_id);
 
   return (
-    <article className="event-card">
+    <article className={`event-card ${event.status === "completed" ? "completed" : ""}`}>
       <div className="event-card-head">
         <div>
           <span className="event-skill">{event.skill_name}</span>
           <h3>{event.title}</h3>
         </div>
-        <span className={`event-status ${event.status}`}>{event.status === "confirmed" ? "Время выбрано" : "Ищем время"}</span>
+        <span className={`event-status ${event.status}`}>{statusLabel(event.status)}</span>
       </div>
       {event.description && <p className="event-description">{event.description}</p>}
       <div className="event-people">
@@ -44,8 +52,37 @@ function EventCard({ event, currentUserId }: { event: CommunityEvent; currentUse
         <span>{event.participants.filter((item) => item.role === "learner").length} участников</span>
       </div>
 
-      {event.status === "confirmed" && confirmedOption ? (
-        <div className="confirmed-slot"><strong>{formatDate(confirmedOption.starts_at)}</strong><span>встреча подтверждена</span></div>
+      {event.status === "completed" ? (
+        <div className="kudos-section">
+          <div className="kudos-heading"><strong>Скажи спасибо пирам</strong><span>Kudos — без рейтингов и оценок</span></div>
+          <div className="kudos-list">
+            {event.participants.map((person) => (
+              <div className="kudos-person" key={person.user_id}>
+                <span className="kudos-avatar">{person.display_name.slice(0, 2).toUpperCase()}</span>
+                <span className="kudos-name"><strong>{person.display_name}</strong><small>{person.role === "teacher" ? "преподаватель" : "участник"} · ♥ {person.kudos_received}</small></span>
+                {person.user_id !== currentUserId && participant && (
+                  <button
+                    type="button"
+                    className={person.kudos_given_by_me ? "kudos-button given" : "kudos-button"}
+                    disabled={person.kudos_given_by_me || kudos.isPending}
+                    onClick={() => kudos.mutate(person.user_id)}
+                  >
+                    {person.kudos_given_by_me ? "Спасибо ✓" : "Дать kudos"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : event.status === "confirmed" && confirmedOption ? (
+        <>
+          <div className="confirmed-slot"><strong>{formatDate(confirmedOption.starts_at)}</strong><span>встреча подтверждена</span></div>
+          {isCreator && (
+            <button className="complete-event" type="button" disabled={complete.isPending} onClick={() => complete.mutate()}>
+              {complete.isPending ? "Завершаем…" : "Отметить встречу завершённой"}
+            </button>
+          )}
+        </>
       ) : (
         <div className="slot-list">
           {event.time_options.map((option) => (
@@ -148,14 +185,15 @@ export default function EventsDock() {
   const me = useQuery({ queryKey: ["me-events"], queryFn: api.me, enabled: authenticated });
   const events = useQuery({ queryKey: ["events"], queryFn: api.events, enabled: authenticated });
 
-  const activeEvents = useMemo(() => events.data ?? [], [events.data]);
+  const allEvents = useMemo(() => events.data ?? [], [events.data]);
+  const activeCount = allEvents.filter((event) => event.status !== "completed").length;
   if (!authenticated || !me.data) return null;
 
   return (
     <div className={`events-dock ${open ? "open" : ""}`}>
       <button className="events-launcher" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
         <span className="launcher-icon">↗</span>
-        <span><strong>Встречи</strong><small>{activeEvents.length ? `${activeEvents.length} активных` : "организовать"}</small></span>
+        <span><strong>Встречи</strong><small>{activeCount ? `${activeCount} активных` : "организовать"}</small></span>
       </button>
       {open && (
         <section className="events-panel" aria-label="Встречи SkillPeer21">
@@ -164,8 +202,8 @@ export default function EventsDock() {
             <div className="events-list">
               {events.isLoading && <div className="event-empty-note">Загружаем встречи…</div>}
               {events.isError && <div className="event-error">Не удалось загрузить встречи.</div>}
-              {!events.isLoading && activeEvents.length === 0 && <div className="events-empty"><div>21</div><strong>Пока тихо</strong><p>Создай первую встречу вокруг навыка, для которого уже нашёлся преподаватель.</p><button type="button" onClick={() => setCreating(true)}>Создать встречу</button></div>}
-              {activeEvents.map((event) => <EventCard key={event.id} event={event} currentUserId={me.data.id} />)}
+              {!events.isLoading && allEvents.length === 0 && <div className="events-empty"><div>21</div><strong>Пока тихо</strong><p>Создай первую встречу вокруг навыка, для которого уже нашёлся преподаватель.</p><button type="button" onClick={() => setCreating(true)}>Создать встречу</button></div>}
+              {allEvents.map((event) => <EventCard key={event.id} event={event} currentUserId={me.data.id} />)}
             </div>
           )}
         </section>
