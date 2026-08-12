@@ -33,6 +33,7 @@ export type Dashboard = {
     members_count: number;
     skills_count: number;
     teaching_offers_count: number;
+    teaching_members_count: number;
     learning_goals_count: number;
     matched_learning_goals_count: number;
   };
@@ -51,6 +52,17 @@ export type Dashboard = {
     skill_name: string;
     teachers_count: number;
     learners_count: number;
+  }>;
+  members: Array<{
+    id: number;
+    display_name: string;
+    telegram_username: string | null;
+  }>;
+  teaching_members: Array<{
+    id: number;
+    display_name: string;
+    telegram_username: string | null;
+    skills: string[];
   }>;
 };
 
@@ -135,9 +147,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   const accessToken = getAccessToken();
-  if (accessToken) {
-    headers.set("Authorization", `Bearer ${accessToken}`);
-  }
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
 
   const response = await fetch(`${API_URL}${path}`, { ...options, headers });
   if (!response.ok) {
@@ -151,68 +161,30 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new Error(detail);
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
 export const api = {
-  login: (login: string, password: string) =>
-    request<TokenPair>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ login, password }),
-    }),
+  login: (login: string, password: string) => request<TokenPair>("/auth/login", { method: "POST", body: JSON.stringify({ login, password }) }),
   me: () => request<User>("/auth/me"),
   dashboard: () => request<Dashboard>("/dashboard"),
   skills: () => request<Skill[]>("/skills"),
   mySkills: () => request<UserSkill[]>("/skills/me"),
-  createSkill: (name: string) =>
-    request<Skill>("/skills", {
-      method: "POST",
-      body: JSON.stringify({ name }),
-    }),
-  addSkillIntent: (skillId: number, intent: "teach" | "learn") =>
-    request<UserSkill>(`/skills/${skillId}/links`, {
-      method: "POST",
-      body: JSON.stringify({ intent }),
-    }),
-  mergeSkill: (sourceSkillId: number, targetSkillId: number) =>
-    request<Skill>(`/skills/${sourceSkillId}/merge`, {
-      method: "POST",
-      body: JSON.stringify({ target_skill_id: targetSkillId }),
-    }),
+  createSkill: (name: string) => request<Skill>("/skills", { method: "POST", body: JSON.stringify({ name }) }),
+  addSkillIntent: (skillId: number, intent: "teach" | "learn") => request<UserSkill>(`/skills/${skillId}/links`, { method: "POST", body: JSON.stringify({ intent }) }),
+  mergeSkill: (sourceSkillId: number, targetSkillId: number) => request<Skill>(`/skills/${sourceSkillId}/merge`, { method: "POST", body: JSON.stringify({ target_skill_id: targetSkillId }) }),
   events: () => request<CommunityEvent[]>("/events"),
-  createEvent: (payload: {
-    skill_id: number;
-    teacher_id: number;
-    title: string;
-    description?: string;
-    time_options: string[];
-  }) => request<CommunityEvent>("/events", { method: "POST", body: JSON.stringify(payload) }),
+  createEvent: (payload: { skill_id: number; teacher_id: number; title: string; description?: string; time_options: string[] }) => request<CommunityEvent>("/events", { method: "POST", body: JSON.stringify(payload) }),
   joinEvent: (eventId: number) => request<CommunityEvent>(`/events/${eventId}/join`, { method: "POST" }),
-  voteEventTime: (eventId: number, optionId: number) =>
-    request<CommunityEvent>(`/events/${eventId}/time-options/${optionId}/vote`, { method: "POST" }),
-  confirmEventTime: (eventId: number, optionId: number) =>
-    request<CommunityEvent>(`/events/${eventId}/confirm`, {
-      method: "POST",
-      body: JSON.stringify({ time_option_id: optionId }),
-    }),
-  completeEvent: (eventId: number) =>
-    request<CommunityEvent>(`/events/${eventId}/complete`, { method: "POST" }),
-  giveKudos: (eventId: number, recipientId: number) =>
-    request<CommunityEvent>(`/events/${eventId}/kudos/${recipientId}`, { method: "POST" }),
+  voteEventTime: (eventId: number, optionId: number) => request<CommunityEvent>(`/events/${eventId}/time-options/${optionId}/vote`, { method: "POST" }),
+  confirmEventTime: (eventId: number, optionId: number) => request<CommunityEvent>(`/events/${eventId}/confirm`, { method: "POST", body: JSON.stringify({ time_option_id: optionId }) }),
+  completeEvent: (eventId: number) => request<CommunityEvent>(`/events/${eventId}/complete`, { method: "POST" }),
+  giveKudos: (eventId: number, recipientId: number) => request<CommunityEvent>(`/events/${eventId}/kudos/${recipientId}`, { method: "POST" }),
   users: () => request<User[]>("/users"),
-  createUser: (payload: {
-    login: string;
-    display_name: string;
-    temporary_password: string;
-    role: "admin" | "member";
-  }) => request<User>("/users", { method: "POST", body: JSON.stringify(payload) }),
+  createUser: (payload: { login: string; display_name: string; temporary_password: string; role: "admin" | "member" }) => request<User>("/users", { method: "POST", body: JSON.stringify(payload) }),
   adminSummary: () => request<AdminSummary>("/admin/summary"),
   adminEvents: () => request<AdminEvent[]>("/admin/events"),
-  updateAdminUser: (userId: number, payload: { is_active?: boolean; role?: "admin" | "member" }) =>
-    request<User>(`/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(payload) }),
-  adminCancelEvent: (eventId: number) =>
-    request<AdminEvent>(`/admin/events/${eventId}/cancel`, { method: "POST" }),
+  updateAdminUser: (userId: number, payload: { is_active?: boolean; role?: "admin" | "member" }) => request<User>(`/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  adminCancelEvent: (eventId: number) => request<AdminEvent>(`/admin/events/${eventId}/cancel`, { method: "POST" }),
 };

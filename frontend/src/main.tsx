@@ -6,6 +6,8 @@ import AdminPanel from "./AdminPanel";
 import App from "./App";
 import EventsDock from "./EventsDock";
 import "./styles.css";
+import "./community.css";
+import "./events-drawer.css";
 
 const queryClient = new QueryClient();
 

@@ -7,13 +7,27 @@ from app.models.skill import Skill, SkillIntent, UserSkill
 from app.models.user import TelegramVisibility, User, UserRole
 from app.schemas.dashboard import (
     DashboardMatch,
+    DashboardMember,
     DashboardRead,
     DashboardSkillStat,
     DashboardSummary,
     DashboardTeacher,
+    DashboardTeachingMember,
 )
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+def _visible_telegram(
+    viewer: User,
+    telegram_username: str | None,
+    visibility: TelegramVisibility,
+) -> str | None:
+    if not telegram_username:
+        return None
+    if visibility == TelegramVisibility.EVERYONE or viewer.role == UserRole.ADMIN:
+        return telegram_username
+    return None
 
 
 @router.get("", response_model=DashboardRead)
@@ -24,6 +38,11 @@ def get_dashboard(user: CurrentUser, db: DbSession) -> DashboardRead:
     skills_count = db.scalar(select(func.count(Skill.id))) or 0
     teaching_offers_count = db.scalar(
         select(func.count(UserSkill.id)).where(UserSkill.intent == SkillIntent.TEACH)
+    ) or 0
+    teaching_members_count = db.scalar(
+        select(func.count(distinct(UserSkill.user_id)))
+        .join(User, User.id == UserSkill.user_id)
+        .where(UserSkill.intent == SkillIntent.TEACH, User.is_active.is_(True))
     ) or 0
     learning_goals_count = db.scalar(
         select(func.count(UserSkill.id)).where(UserSkill.intent == SkillIntent.LEARN)
@@ -53,10 +72,7 @@ def get_dashboard(user: CurrentUser, db: DbSession) -> DashboardRead:
         )
         .outerjoin(UserSkill, UserSkill.skill_id == Skill.id)
         .group_by(Skill.id, Skill.name)
-        .order_by(
-            func.count(UserSkill.id).desc(),
-            Skill.name,
-        )
+        .order_by(func.count(UserSkill.id).desc(), Skill.name)
     ).all()
     skills = [
         DashboardSkillStat(
@@ -67,6 +83,47 @@ def get_dashboard(user: CurrentUser, db: DbSession) -> DashboardRead:
         )
         for skill_id, name, teachers_count, learners_count in skill_rows
     ]
+
+    member_rows = db.execute(
+        select(User.id, User.display_name, User.telegram_username, User.telegram_visibility)
+        .where(User.is_active.is_(True))
+        .order_by(User.display_name, User.id)
+    ).all()
+    members = [
+        DashboardMember(
+            id=member_id,
+            display_name=display_name,
+            telegram_username=_visible_telegram(user, telegram_username, telegram_visibility),
+        )
+        for member_id, display_name, telegram_username, telegram_visibility in member_rows
+    ]
+
+    teaching_rows = db.execute(
+        select(
+            User.id,
+            User.display_name,
+            User.telegram_username,
+            User.telegram_visibility,
+            Skill.name,
+        )
+        .join(UserSkill, UserSkill.user_id == User.id)
+        .join(Skill, Skill.id == UserSkill.skill_id)
+        .where(UserSkill.intent == SkillIntent.TEACH, User.is_active.is_(True))
+        .order_by(User.display_name, Skill.name)
+    ).all()
+    teaching_by_user: dict[int, DashboardTeachingMember] = {}
+    for teacher_id, display_name, telegram_username, telegram_visibility, skill_name in teaching_rows:
+        teacher = teaching_by_user.get(teacher_id)
+        if teacher is None:
+            teacher = DashboardTeachingMember(
+                id=teacher_id,
+                display_name=display_name,
+                telegram_username=_visible_telegram(user, telegram_username, telegram_visibility),
+                skills=[],
+            )
+            teaching_by_user[teacher_id] = teacher
+        teacher.skills.append(skill_name)
+    teaching_members = list(teaching_by_user.values())
 
     learning_rows = db.execute(
         select(Skill.id, Skill.name)
@@ -101,15 +158,7 @@ def get_dashboard(user: CurrentUser, db: DbSession) -> DashboardRead:
             DashboardTeacher(
                 id=teacher_id,
                 display_name=display_name,
-                telegram_username=(
-                    telegram_username
-                    if telegram_username
-                    and (
-                        telegram_visibility == TelegramVisibility.EVERYONE
-                        or user.role == UserRole.ADMIN
-                    )
-                    else None
-                ),
+                telegram_username=_visible_telegram(user, telegram_username, telegram_visibility),
             )
             for teacher_id, display_name, telegram_username, telegram_visibility in teacher_rows
         ]
@@ -129,9 +178,12 @@ def get_dashboard(user: CurrentUser, db: DbSession) -> DashboardRead:
             members_count=members_count,
             skills_count=skills_count,
             teaching_offers_count=teaching_offers_count,
+            teaching_members_count=teaching_members_count,
             learning_goals_count=learning_goals_count,
             matched_learning_goals_count=matched_learning_goals_count,
         ),
         matches=matches,
         skills=skills,
+        members=members,
+        teaching_members=teaching_members,
     )
