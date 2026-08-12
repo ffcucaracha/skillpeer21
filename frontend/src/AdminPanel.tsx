@@ -19,7 +19,7 @@ function UserCreateForm({ onDone }: { onDone: () => void }) {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"member" | "admin">("member");
   const mutation = useMutation({
-    mutationFn: () => api.createUser({ login, display_name: displayName, temporary_password: password, role }),
+    mutationFn: () => api.createUser({ login, display_name: displayName.trim() || null, temporary_password: password, role }),
     onSuccess: onDone,
   });
 
@@ -32,7 +32,7 @@ function UserCreateForm({ onDone }: { onDone: () => void }) {
     <form className="admin-form" onSubmit={submit}>
       <div className="admin-form-grid">
         <label>Логин<input value={login} onChange={(e) => setLogin(e.target.value)} required minLength={3} /></label>
-        <label>Имя<input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required /></label>
+        <label>Имя <small>(необязательно)</small><input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Если пусто, будет использоваться логин" /></label>
         <label>Временный пароль<input value={password} onChange={(e) => setPassword(e.target.value)} required minLength={10} /></label>
         <label>Роль<select value={role} onChange={(e) => setRole(e.target.value as "member" | "admin")}><option value="member">Участник</option><option value="admin">Администратор</option></select></label>
       </div>
