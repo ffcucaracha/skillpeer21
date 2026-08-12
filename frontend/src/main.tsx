@@ -8,6 +8,7 @@ import EventsDock from "./EventsDock";
 import "./styles.css";
 import "./community.css";
 import "./events-drawer.css";
+import "./profile.css";
 
 const queryClient = new QueryClient();
 
