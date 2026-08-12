@@ -23,6 +23,8 @@ class EventParticipantRead(BaseModel):
     user_id: int
     display_name: str
     role: EventParticipantRole
+    kudos_received: int = 0
+    kudos_given_by_me: bool = False
 
 
 class EventTimeOptionRead(BaseModel):
