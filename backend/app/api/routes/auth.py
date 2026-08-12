@@ -10,6 +10,7 @@ from app.schemas.user import (
     LoginRequest,
     RefreshRequest,
     TokenPair,
+    UserProfileUpdate,
     UserRead,
 )
 
@@ -57,6 +58,15 @@ def refresh(payload: RefreshRequest, db: DbSession) -> TokenPair:
 
 @router.get("/me", response_model=UserRead)
 def me(user: CurrentUser) -> User:
+    return user
+
+
+@router.patch("/me", response_model=UserRead)
+def update_me(payload: UserProfileUpdate, user: CurrentUser, db: DbSession) -> User:
+    user.telegram_username = payload.telegram_username
+    user.telegram_visibility = payload.telegram_visibility
+    db.commit()
+    db.refresh(user)
     return user
 
 
