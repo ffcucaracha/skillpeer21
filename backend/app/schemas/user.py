@@ -16,14 +16,29 @@ class TelegramMixin(BaseModel):
 
 class UserCreate(TelegramMixin):
     login: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$")
-    display_name: str = Field(min_length=1, max_length=120)
+    display_name: str | None = Field(default=None, max_length=120)
     temporary_password: str = Field(min_length=10, max_length=128)
     role: UserRole = UserRole.MEMBER
     telegram_visibility: TelegramVisibility = TelegramVisibility.ADMIN_ONLY
 
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        return value.strip()
+
 
 class UserProfileUpdate(TelegramMixin):
+    display_name: str | None = Field(default=None, max_length=120)
     telegram_visibility: TelegramVisibility
+
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        return value.strip()
 
 
 class UserRead(BaseModel):

@@ -14,7 +14,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 def create_user(payload: UserCreate, _admin: AdminUser, db: DbSession) -> User:
     user = User(
         login=payload.login,
-        display_name=payload.display_name,
+        display_name=payload.display_name or payload.login,
         password_hash=hash_password(payload.temporary_password),
         role=payload.role,
         telegram_username=payload.telegram_username,
