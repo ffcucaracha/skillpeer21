@@ -1,6 +1,6 @@
 [project]
 name = "skillpeer21-backend"
-version = "0.1.0"
+version = "0.2.0"
 description = "SkillPeer21 API"
 requires-python = ">=3.12"
 dependencies = [
@@ -10,6 +10,8 @@ dependencies = [
   "psycopg[binary]>=3.2,<4.0",
   "pydantic-settings>=2.10,<3.0",
   "alembic>=1.16,<2.0",
+  "PyJWT>=2.10,<3.0",
+  "pwdlib[argon2]>=0.3,<1.0",
 ]
 
 [project.optional-dependencies]

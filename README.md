@@ -14,6 +14,7 @@ The first version is intentionally small: users are created by an administrator,
 - Backend: Python + FastAPI
 - Database: PostgreSQL
 - ORM/migrations: SQLAlchemy 2 + Alembic
+- Authentication: JWT access/refresh tokens + Argon2 password hashing
 - Infrastructure: Docker Compose
 - Tests: pytest
 
@@ -30,16 +31,26 @@ skillpeer21/
 
 ## Local development
 
-Copy the environment template:
+Copy the environment template and start the stack:
 
 ```bash
 cp .env.example .env
+docker compose up --build -d
 ```
 
-Start the stack:
+Apply database migrations:
 
 ```bash
-docker compose up --build
+docker compose exec backend alembic upgrade head
+```
+
+Create the first administrator. This bootstrap command intentionally stops working after an admin already exists; additional administrators can then be created through the API.
+
+```bash
+docker compose exec backend python -m app.cli create-admin \
+  --login admin \
+  --display-name "Administrator" \
+  --password "replace-with-a-strong-password"
 ```
 
 After startup:
@@ -49,9 +60,22 @@ After startup:
 - OpenAPI: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
 
-## MVP scope
+## Authentication and user management
 
-The planned first milestone includes:
+Public registration does not exist. Administrators create all accounts and assign a temporary password. A new account has `must_change_password=true` until the member changes it. Password changes increment the user's token version, invalidating previously issued access and refresh tokens.
+
+Current API endpoints:
+
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
+- `GET /api/v1/auth/me`
+- `POST /api/v1/auth/change-password`
+- `POST /api/v1/users` — admin only
+- `GET /api/v1/users` — admin only
+
+Telegram username is optional. If supplied, the member chooses whether it is visible to everyone in the community or only to administrators.
+
+## MVP scope
 
 - admin-managed users;
 - authentication;
@@ -61,7 +85,7 @@ The planned first milestone includes:
 - skill matching;
 - event proposals initiated by teachers or learners;
 - event time options and participant voting;
-- optional Telegram username with `public` or `admin only` visibility;
+- optional Telegram username with `everyone` or `admin_only` visibility;
 - community statistics for admins;
 - kudos after completed sessions.
 
