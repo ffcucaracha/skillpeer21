@@ -25,29 +25,37 @@ skillpeer21/
 ├── backend/
 ├── frontend/
 ├── docker-compose.yml
+├── docker-compose.dev.yml
 ├── .env.example
 └── README.md
 ```
 
 ## Local development
 
-Copy the environment template and start the stack:
+Requirements: Docker with Docker Compose plugin.
+
+Copy the environment template:
 
 ```bash
 cp .env.example .env
-docker compose up --build -d
 ```
 
-Apply database migrations:
+Start the development stack with hot reload for FastAPI and Vite:
 
 ```bash
-docker compose exec backend alembic upgrade head
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-Create the first administrator. This bootstrap command intentionally stops working after an admin already exists; additional administrators can then be created through the API.
+In another terminal apply database migrations:
 
 ```bash
-docker compose exec backend python -m app.cli create-admin \
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec backend alembic upgrade head
+```
+
+Create the first administrator. The bootstrap command stops working after an administrator already exists; additional users and administrators are created from the admin interface.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec backend python -m app.cli create-admin \
   --login admin \
   --display-name "Administrator" \
   --password "replace-with-a-strong-password"
@@ -59,6 +67,20 @@ After startup:
 - Backend: http://localhost:8000
 - OpenAPI: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
+
+Source directories are bind-mounted into the development containers. Changes under `backend/` restart Uvicorn automatically; changes under `frontend/` are picked up by Vite HMR.
+
+Stop the stack with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+```
+
+To also remove the local PostgreSQL volume and reset the database:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+```
 
 ## Authentication and user management
 
