@@ -26,7 +26,9 @@ skillpeer21/
 ├── frontend/
 ├── docker-compose.yml
 ├── docker-compose.dev.yml
+├── docker-compose.prod.yml
 ├── .env.example
+├── .env.prod.example
 └── README.md
 ```
 
@@ -81,6 +83,43 @@ To also remove the local PostgreSQL volume and reset the database:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
 ```
+
+## Production Docker
+
+Copy the production environment template and replace all placeholder secrets:
+
+```bash
+cp .env.prod.example .env.prod
+```
+
+Start the production stack:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+The production stack builds the React application once and serves it through nginx. nginx proxies `/api/*` to FastAPI, PostgreSQL is not published to the host, FastAPI runs without reload, and Alembic migrations are applied automatically before the backend starts.
+
+The service is available on `http://localhost` by default. Change `HTTP_PORT` in `.env.prod` when port 80 is unavailable.
+
+Create the first administrator after the first deployment:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec backend python -m app.cli create-admin \
+  --login admin \
+  --display-name "Administrator" \
+  --password "replace-with-a-strong-password"
+```
+
+View logs or stop the stack:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f
+
+docker compose --env-file .env.prod -f docker-compose.prod.yml down
+```
+
+TLS/HTTPS should normally be terminated by an external reverse proxy or load balancer in front of this Compose stack.
 
 ## Authentication and user management
 
