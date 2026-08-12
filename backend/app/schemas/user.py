@@ -3,13 +3,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.user import TelegramVisibility, UserRole
 
 
-class UserCreate(BaseModel):
-    login: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$")
-    display_name: str = Field(min_length=1, max_length=120)
-    temporary_password: str = Field(min_length=10, max_length=128)
-    role: UserRole = UserRole.MEMBER
+class TelegramMixin(BaseModel):
     telegram_username: str | None = Field(default=None, max_length=64)
-    telegram_visibility: TelegramVisibility = TelegramVisibility.ADMIN_ONLY
 
     @field_validator("telegram_username")
     @classmethod
@@ -17,6 +12,18 @@ class UserCreate(BaseModel):
         if value is None or not value.strip():
             return None
         return value.strip().removeprefix("@")
+
+
+class UserCreate(TelegramMixin):
+    login: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$")
+    display_name: str = Field(min_length=1, max_length=120)
+    temporary_password: str = Field(min_length=10, max_length=128)
+    role: UserRole = UserRole.MEMBER
+    telegram_visibility: TelegramVisibility = TelegramVisibility.ADMIN_ONLY
+
+
+class UserProfileUpdate(TelegramMixin):
+    telegram_visibility: TelegramVisibility
 
 
 class UserRead(BaseModel):
