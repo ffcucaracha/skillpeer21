@@ -168,11 +168,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const api = {
   login: (login: string, password: string) => request<TokenPair>("/auth/login", { method: "POST", body: JSON.stringify({ login, password }) }),
   me: () => request<User>("/auth/me"),
+  updateProfile: (payload: { telegram_username: string | null; telegram_visibility: "everyone" | "admin_only" }) =>
+    request<User>("/auth/me", { method: "PATCH", body: JSON.stringify(payload) }),
   dashboard: () => request<Dashboard>("/dashboard"),
   skills: () => request<Skill[]>("/skills"),
   mySkills: () => request<UserSkill[]>("/skills/me"),
   createSkill: (name: string) => request<Skill>("/skills", { method: "POST", body: JSON.stringify({ name }) }),
   addSkillIntent: (skillId: number, intent: "teach" | "learn") => request<UserSkill>(`/skills/${skillId}/links`, { method: "POST", body: JSON.stringify({ intent }) }),
+  removeSkillIntent: (skillId: number, intent: "teach" | "learn") => request<void>(`/skills/${skillId}/links/${intent}`, { method: "DELETE" }),
   mergeSkill: (sourceSkillId: number, targetSkillId: number) => request<Skill>(`/skills/${sourceSkillId}/merge`, { method: "POST", body: JSON.stringify({ target_skill_id: targetSkillId }) }),
   events: () => request<CommunityEvent[]>("/events"),
   createEvent: (payload: { skill_id: number; teacher_id: number; title: string; description?: string; time_options: string[] }) => request<CommunityEvent>("/events", { method: "POST", body: JSON.stringify(payload) }),

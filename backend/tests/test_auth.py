@@ -106,3 +106,18 @@ def test_refresh_token_cannot_be_used_as_access_token() -> None:
     tokens = login("admin", "temporary-admin")
     response = client.get("/api/v1/auth/me", headers=auth_header(tokens["refresh_token"]))
     assert response.status_code == 401
+
+
+def test_user_can_update_telegram_and_visibility() -> None:
+    tokens = login("admin", "temporary-admin")
+    response = client.patch(
+        "/api/v1/auth/me",
+        headers=auth_header(tokens["access_token"]),
+        json={"telegram_username": "@skill_peer", "telegram_visibility": "everyone"},
+    )
+    assert response.status_code == 200
+    assert response.json()["telegram_username"] == "skill_peer"
+    assert response.json()["telegram_visibility"] == "everyone"
+
+    me = client.get("/api/v1/auth/me", headers=auth_header(tokens["access_token"]))
+    assert me.json()["telegram_username"] == "skill_peer"
