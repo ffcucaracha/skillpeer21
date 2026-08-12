@@ -8,6 +8,23 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: skillpeer21_test
+          POSTGRES_USER: skillpeer21
+          POSTGRES_PASSWORD: skillpeer21
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U skillpeer21 -d skillpeer21_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://skillpeer21:skillpeer21@localhost:5432/skillpeer21_test
+      JWT_SECRET: ci-only-secret
     defaults:
       run:
         working-directory: backend
@@ -21,6 +38,8 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Ruff
         run: ruff check .
+      - name: Migrations
+        run: alembic upgrade head
       - name: Tests
         run: pytest
 
