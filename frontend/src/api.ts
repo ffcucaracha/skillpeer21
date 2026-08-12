@@ -3,6 +3,7 @@ export type User = {
   login: string;
   display_name: string;
   role: "admin" | "member";
+  is_active: boolean;
   must_change_password: boolean;
   telegram_username: string | null;
   telegram_visibility: "everyone" | "admin_only";
@@ -82,6 +83,28 @@ export type CommunityEvent = {
   created_at: string;
 };
 
+export type AdminSummary = {
+  users_total: number;
+  users_active: number;
+  skills_total: number;
+  events_total: number;
+  events_scheduling: number;
+  events_confirmed: number;
+  events_completed: number;
+  kudos_total: number;
+};
+
+export type AdminEvent = {
+  id: number;
+  title: string;
+  skill_name: string;
+  creator_name: string;
+  teacher_name: string;
+  status: CommunityEvent["status"];
+  participants_count: number;
+  created_at: string;
+};
+
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 const ACCESS_KEY = "skillpeer21.access";
 const REFRESH_KEY = "skillpeer21.refresh";
@@ -154,6 +177,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ intent }),
     }),
+  mergeSkill: (sourceSkillId: number, targetSkillId: number) =>
+    request<Skill>(`/skills/${sourceSkillId}/merge`, {
+      method: "POST",
+      body: JSON.stringify({ target_skill_id: targetSkillId }),
+    }),
   events: () => request<CommunityEvent[]>("/events"),
   createEvent: (payload: {
     skill_id: number;
@@ -174,4 +202,17 @@ export const api = {
     request<CommunityEvent>(`/events/${eventId}/complete`, { method: "POST" }),
   giveKudos: (eventId: number, recipientId: number) =>
     request<CommunityEvent>(`/events/${eventId}/kudos/${recipientId}`, { method: "POST" }),
+  users: () => request<User[]>("/users"),
+  createUser: (payload: {
+    login: string;
+    display_name: string;
+    temporary_password: string;
+    role: "admin" | "member";
+  }) => request<User>("/users", { method: "POST", body: JSON.stringify(payload) }),
+  adminSummary: () => request<AdminSummary>("/admin/summary"),
+  adminEvents: () => request<AdminEvent[]>("/admin/events"),
+  updateAdminUser: (userId: number, payload: { is_active?: boolean; role?: "admin" | "member" }) =>
+    request<User>(`/admin/users/${userId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  adminCancelEvent: (eventId: number) =>
+    request<AdminEvent>(`/admin/events/${eventId}/cancel`, { method: "POST" }),
 };
