@@ -1,6 +1,7 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.models.event import Event
 from app.models.skill import Skill, UserSkill
 
 
@@ -26,6 +27,7 @@ def merge_skills(db: Session, source: Skill, target: Skill) -> Skill:
         else:
             link.skill_id = target.id
 
+    db.execute(update(Event).where(Event.skill_id == source.id).values(skill_id=target.id))
     db.delete(source)
     db.commit()
     db.refresh(target)

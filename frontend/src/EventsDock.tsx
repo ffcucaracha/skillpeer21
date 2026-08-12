@@ -1,0 +1,175 @@
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, getAccessToken, onAuthChange, type CommunityEvent } from "./api";
+import "./events.css";
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function EventCard({ event, currentUserId }: { event: CommunityEvent; currentUserId: number }) {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const participant = event.participants.some((item) => item.user_id === currentUserId);
+  const isCreator = event.creator_id === currentUserId;
+
+  const refresh = async () => {
+    setError(null);
+    await queryClient.invalidateQueries({ queryKey: ["events"] });
+  };
+
+  const join = useMutation({ mutationFn: () => api.joinEvent(event.id), onSuccess: refresh, onError: (e: Error) => setError(e.message) });
+  const vote = useMutation({ mutationFn: (optionId: number) => api.voteEventTime(event.id, optionId), onSuccess: refresh, onError: (e: Error) => setError(e.message) });
+  const confirm = useMutation({ mutationFn: (optionId: number) => api.confirmEventTime(event.id, optionId), onSuccess: refresh, onError: (e: Error) => setError(e.message) });
+
+  const confirmedOption = event.time_options.find((option) => option.id === event.confirmed_time_option_id);
+
+  return (
+    <article className="event-card">
+      <div className="event-card-head">
+        <div>
+          <span className="event-skill">{event.skill_name}</span>
+          <h3>{event.title}</h3>
+        </div>
+        <span className={`event-status ${event.status}`}>{event.status === "confirmed" ? "Время выбрано" : "Ищем время"}</span>
+      </div>
+      {event.description && <p className="event-description">{event.description}</p>}
+      <div className="event-people">
+        <span>{event.participants.find((item) => item.role === "teacher")?.display_name} · преподаватель</span>
+        <span>{event.participants.filter((item) => item.role === "learner").length} участников</span>
+      </div>
+
+      {event.status === "confirmed" && confirmedOption ? (
+        <div className="confirmed-slot"><strong>{formatDate(confirmedOption.starts_at)}</strong><span>встреча подтверждена</span></div>
+      ) : (
+        <div className="slot-list">
+          {event.time_options.map((option) => (
+            <div className={`slot-row ${option.voted_by_me ? "selected" : ""}`} key={option.id}>
+              <button type="button" disabled={!participant || vote.isPending} onClick={() => vote.mutate(option.id)}>
+                <span className="slot-check">{option.voted_by_me ? "✓" : ""}</span>
+                <span><strong>{formatDate(option.starts_at)}</strong><small>{option.votes_count} голосов{option.teacher_voted ? " · преподаватель может" : ""}</small></span>
+              </button>
+              {isCreator && option.teacher_voted && (
+                <button className="confirm-slot" type="button" disabled={confirm.isPending} onClick={() => confirm.mutate(option.id)}>Выбрать</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!participant && event.status === "scheduling" && (
+        <button className="event-secondary" type="button" disabled={join.isPending} onClick={() => join.mutate()}>
+          Присоединиться и голосовать
+        </button>
+      )}
+      {error && <div className="event-error">{error}</div>}
+    </article>
+  );
+}
+
+function CreateEvent({ onDone }: { onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const dashboard = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard });
+  const [matchIndex, setMatchIndex] = useState("");
+  const [teacherId, setTeacherId] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [firstTime, setFirstTime] = useState("");
+  const [secondTime, setSecondTime] = useState("");
+
+  const matches = dashboard.data?.matches ?? [];
+  const selectedMatch = matchIndex === "" ? null : matches[Number(matchIndex)];
+
+  const mutation = useMutation({
+    mutationFn: () => api.createEvent({
+      skill_id: selectedMatch!.skill_id,
+      teacher_id: Number(teacherId),
+      title,
+      description: description || undefined,
+      time_options: [new Date(firstTime).toISOString(), new Date(secondTime).toISOString()],
+    }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["events"] });
+      onDone();
+    },
+  });
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedMatch || !teacherId || !firstTime || !secondTime) return;
+    mutation.mutate();
+  }
+
+  return (
+    <form className="event-create" onSubmit={submit}>
+      <div className="event-form-title"><span>Новая встреча</span><strong>Собери пиров вокруг навыка</strong></div>
+      {matches.length === 0 ? (
+        <div className="event-empty-note">Сначала добавь навык, которому хочешь научиться, и дождись совпадения с преподавателем.</div>
+      ) : (
+        <>
+          <label>Навык
+            <select value={matchIndex} onChange={(e) => { setMatchIndex(e.target.value); setTeacherId(""); }} required>
+              <option value="">Выбери навык</option>
+              {matches.map((match, index) => <option key={match.skill_id} value={index}>{match.skill_name}</option>)}
+            </select>
+          </label>
+          <label>Преподаватель
+            <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} required disabled={!selectedMatch}>
+              <option value="">Выбери пира</option>
+              {selectedMatch?.teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.display_name}</option>)}
+            </select>
+          </label>
+          <label>Название встречи<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, Гитара с нуля" minLength={3} required /></label>
+          <label>Что хотите разобрать<textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Коротко опиши цель первой встречи" rows={3} /></label>
+          <div className="time-grid">
+            <label>Вариант 1<input type="datetime-local" value={firstTime} onChange={(e) => setFirstTime(e.target.value)} required /></label>
+            <label>Вариант 2<input type="datetime-local" value={secondTime} onChange={(e) => setSecondTime(e.target.value)} required /></label>
+          </div>
+          {mutation.isError && <div className="event-error">{mutation.error.message}</div>}
+          <button className="event-primary" type="submit" disabled={mutation.isPending}>{mutation.isPending ? "Создаём…" : "Создать встречу"}</button>
+        </>
+      )}
+    </form>
+  );
+}
+
+export default function EventsDock() {
+  const [authenticated, setAuthenticated] = useState(Boolean(getAccessToken()));
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => onAuthChange(() => setAuthenticated(Boolean(getAccessToken()))), []);
+
+  const me = useQuery({ queryKey: ["me-events"], queryFn: api.me, enabled: authenticated });
+  const events = useQuery({ queryKey: ["events"], queryFn: api.events, enabled: authenticated });
+
+  const activeEvents = useMemo(() => events.data ?? [], [events.data]);
+  if (!authenticated || !me.data) return null;
+
+  return (
+    <div className={`events-dock ${open ? "open" : ""}`}>
+      <button className="events-launcher" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
+        <span className="launcher-icon">↗</span>
+        <span><strong>Встречи</strong><small>{activeEvents.length ? `${activeEvents.length} активных` : "организовать"}</small></span>
+      </button>
+      {open && (
+        <section className="events-panel" aria-label="Встречи SkillPeer21">
+          <header><div><span>SkillPeer21</span><h2>Встречи</h2></div><button type="button" onClick={() => setCreating((value) => !value)}>{creating ? "К списку" : "+ Создать"}</button></header>
+          {creating ? <CreateEvent onDone={() => setCreating(false)} /> : (
+            <div className="events-list">
+              {events.isLoading && <div className="event-empty-note">Загружаем встречи…</div>}
+              {events.isError && <div className="event-error">Не удалось загрузить встречи.</div>}
+              {!events.isLoading && activeEvents.length === 0 && <div className="events-empty"><div>21</div><strong>Пока тихо</strong><p>Создай первую встречу вокруг навыка, для которого уже нашёлся преподаватель.</p><button type="button" onClick={() => setCreating(true)}>Создать встречу</button></div>}
+              {activeEvents.map((event) => <EventCard key={event.id} event={event} currentUserId={me.data.id} />)}
+            </div>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
