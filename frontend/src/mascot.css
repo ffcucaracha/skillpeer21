@@ -1,0 +1,24 @@
+/* Final mascot overrides: use the generated PNG instead of the hand-drawn SVG. */
+.dashboard-header::before {
+  background-image: url('/space-cat.png');
+  background-size: 220px auto;
+  background-position: center right 34px;
+  background-repeat: no-repeat;
+}
+
+.login-cat {
+  content: url('/space-cat.png');
+  object-fit: contain;
+}
+
+/* The login no longer describes the password as temporary. */
+.brand-login-card > div:nth-child(2) p {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-header::before {
+    background-size: 190px auto;
+    background-position: center right 18px;
+  }
+}
