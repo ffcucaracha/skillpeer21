@@ -15,7 +15,9 @@ SkillPeer21 is a peer-to-peer skill exchange platform for the School 21 communit
 
 - Users are created only by administrators; public self-registration is out of scope.
 - A member may have any number of skills they can teach and want to learn.
-- Skills come from a moderated catalogue; members may suggest new skills.
+- Any authenticated member may add a skill directly to the shared catalogue.
+- Skill names are normalized to prevent trivial duplicates; administrators may merge semantically duplicate skills.
+- Merging a skill must repoint all existing references to the retained skill before deleting the duplicate.
 - Skill levels are intentionally not modeled in the MVP.
 - Any member may propose an event either from a skill they can teach or one they want to learn.
 - An event represents an initial session; the number of future sessions is not specified in advance.
@@ -32,6 +34,7 @@ SkillPeer21 is a peer-to-peer skill exchange platform for the School 21 communit
 - Validate request/response payloads with Pydantic models.
 - Do not expose ORM entities directly from API routes.
 - Add tests for business rules and permission boundaries.
+- Keep skill merge logic centralized and extend its tests whenever a new table references `skills.id`.
 - Prefer explicit enums/value objects for finite state rather than magic strings spread through the codebase.
 - Never commit secrets or real credentials.
 

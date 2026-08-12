@@ -19,8 +19,14 @@ engine = create_engine(
 TestingSession = sessionmaker(bind=engine, expire_on_commit=False)
 
 
+def override_db() -> Generator[Session, None, None]:
+    with TestingSession() as session:
+        yield session
+
+
 @pytest.fixture(autouse=True)
 def database() -> Generator[None, None, None]:
+    app.dependency_overrides[get_db] = override_db
     Base.metadata.create_all(engine)
     with TestingSession() as db:
         db.add(
@@ -33,15 +39,10 @@ def database() -> Generator[None, None, None]:
         )
         db.commit()
     yield
+    app.dependency_overrides.pop(get_db, None)
     Base.metadata.drop_all(engine)
 
 
-def override_db() -> Generator[Session, None, None]:
-    with TestingSession() as session:
-        yield session
-
-
-app.dependency_overrides[get_db] = override_db
 client = TestClient(app)
 
 

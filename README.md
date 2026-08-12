@@ -6,7 +6,7 @@ Peer-to-peer skill exchange platform for School 21.
 
 SkillPeer21 helps School 21 community members share skills and organize peer-learning sessions. Each member can list skills they can teach and skills they want to learn. The platform surfaces matches and lets members create events around those skills.
 
-The first version is intentionally small: users are created by an administrator, skills are moderated, events can be proposed by any member, participants vote on suggested time slots, Telegram contact visibility is controlled by the user, and completed sessions may receive kudos.
+The first version is intentionally small: users are created by an administrator, any member may add skills to the shared catalogue, duplicate skills can be merged by an administrator, events can be proposed by any member, participants vote on suggested time slots, Telegram contact visibility is controlled by the user, and completed sessions may receive kudos.
 
 ## Stack
 
@@ -75,13 +75,28 @@ Current API endpoints:
 
 Telegram username is optional. If supplied, the member chooses whether it is visible to everyone in the community or only to administrators.
 
+## Skills
+
+Skills are stored in a shared catalogue. Any authenticated member can create a skill and then attach it to their profile as either `teach` or `learn`. Skill names are whitespace-normalized and case-insensitive for duplicate detection.
+
+An administrator can merge two semantically duplicate skills. During the merge, every current reference to the source skill is moved to the retained target skill. If the same user already has the target skill with the same intent, the duplicate link is removed. The source skill is deleted only after its references have been resolved.
+
+Skill API endpoints:
+
+- `GET /api/v1/skills`
+- `POST /api/v1/skills`
+- `GET /api/v1/skills/me`
+- `POST /api/v1/skills/{skill_id}/links`
+- `DELETE /api/v1/skills/{skill_id}/links/{intent}`
+- `POST /api/v1/skills/{source_skill_id}/merge` — admin only
+
 ## MVP scope
 
 - admin-managed users;
 - authentication;
 - member profile;
-- moderated skill catalogue;
-- unlimited `can teach` and `want to learn` skills per member;
+- community-managed skill catalogue with admin merge support;
+- unlimited `teach` and `learn` skills per member;
 - skill matching;
 - event proposals initiated by teachers or learners;
 - event time options and participant voting;
