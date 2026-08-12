@@ -19,8 +19,6 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     event_status = sa.Enum("SCHEDULING", "CONFIRMED", "COMPLETED", "CANCELLED", name="event_status")
     participant_role = sa.Enum("TEACHER", "LEARNER", name="event_participant_role")
-    event_status.create(op.get_bind(), checkfirst=True)
-    participant_role.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "events",
